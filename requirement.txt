@@ -1,0 +1,32 @@
+# Core LangGraph / LangChain
+langgraph>=1.0.5
+langchain-core>=1.2.7
+langchain-google-genai>=2.1.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# UI
+streamlit>=1.32.0
+plotly>=5.18.0
+
+# Financial Data
+yfinance>=0.2.36
+requests>=2.31.0
+
+# RAG
+faiss-cpu>=1.7.4
+pypdf>=4.0.0
+tiktoken>=0.7.0
+
+# Sentiment / News
+feedparser>=6.0.0
+
+# Architecture Diagram
+graphviz>=0.20.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+
+# Testing
+pytest>=8.0.0
