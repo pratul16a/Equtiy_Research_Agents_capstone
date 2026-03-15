@@ -1,0 +1,96 @@
+{
+  "PLI_Electronics": {
+    "tailwind_sectors": ["Technology", "Consumer Cyclical"],
+    "tailwind_tickers": ["DIXON.NS", "AMBER.NS", "KAYNES.NS", "SYRMA.NS"],
+    "keywords": ["PLI", "production linked incentive", "electronics manufacturing", "semiconductor"],
+    "impact": "high"
+  },
+  "EV_Policy": {
+    "tailwind_sectors": ["Automobiles", "Consumer Cyclical"],
+    "tailwind_tickers": ["TATAMOTORS.NS", "EXIDEIND.NS", "AMARAJABAT.NS", "OLECTRA.NS"],
+    "headwind_tickers": ["HEROMOTOCO.NS"],
+    "keywords": ["electric vehicle", "EV policy", "FAME", "battery", "EV charging"],
+    "impact": "medium"
+  },
+  "Defense_Indigenization": {
+    "tailwind_sectors": ["Industrials"],
+    "tailwind_tickers": ["HAL.NS", "BEL.NS", "BHEL.NS", "MAZAGON.NS", "COCHINSHIP.NS"],
+    "keywords": ["defense", "indigenization", "Make in India defense", "defense order", "Atmanirbhar defense"],
+    "impact": "high"
+  },
+  "Infrastructure_Spend": {
+    "tailwind_sectors": ["Industrials", "Basic Materials"],
+    "tailwind_tickers": ["LTIM.NS", "LT.NS", "ULTRACEMCO.NS", "ACC.NS", "AMBUJACEM.NS"],
+    "keywords": ["infrastructure", "national highway", "metro project", "smart city", "Gati Shakti", "NIP"],
+    "impact": "high"
+  },
+  "PLI_Pharma": {
+    "tailwind_sectors": ["Healthcare"],
+    "tailwind_tickers": ["SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS"],
+    "keywords": ["PLI pharma", "API manufacturing", "bulk drug", "pharma PLI"],
+    "impact": "medium"
+  },
+  "Sugar_Ethanol": {
+    "tailwind_sectors": ["Consumer Defensive"],
+    "tailwind_tickers": ["BALRAMCHIN.NS", "SHREERENUKA.NS", "TRIVENI.NS", "DWARIKESH.NS"],
+    "keywords": ["ethanol blending", "sugar ethanol", "E20", "biofuel policy"],
+    "impact": "medium"
+  },
+  "Data_Localization": {
+    "tailwind_sectors": ["Technology"],
+    "tailwind_tickers": ["TCS.NS", "INFY.NS", "WIPRO.NS", "HCLTECH.NS"],
+    "headwind_tickers": [],
+    "keywords": ["data localization", "data protection", "DPDP", "data center India"],
+    "impact": "medium"
+  },
+  "Green_Energy": {
+    "tailwind_sectors": ["Utilities", "Energy"],
+    "tailwind_tickers": ["ADANIGREEN.NS", "TATAPOWER.NS", "NHPC.NS", "SJVN.NS", "IREDA.NS"],
+    "keywords": ["renewable energy", "solar policy", "green hydrogen", "wind energy", "PLI solar"],
+    "impact": "high"
+  },
+  "RBI_Rate_Policy": {
+    "tailwind_sectors": ["Financial Services"],
+    "headwind_sectors": ["Real Estate"],
+    "tailwind_tickers": [],
+    "keywords": ["RBI rate cut", "repo rate", "monetary policy", "rate hike", "MPC"],
+    "impact": "high"
+  },
+  "Anti_Dumping": {
+    "tailwind_sectors": ["Basic Materials"],
+    "tailwind_tickers": ["TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "SAIL.NS"],
+    "keywords": ["anti-dumping", "safeguard duty", "import duty steel", "BIS certification"],
+    "impact": "medium"
+  },
+  "Textile_PLI": {
+    "tailwind_sectors": ["Consumer Cyclical"],
+    "tailwind_tickers": ["PAGEIND.NS", "RAYMOND.NS", "ARVIND.NS", "TRIDENT.NS"],
+    "keywords": ["PLI textile", "textile export", "technical textile", "MMF"],
+    "impact": "medium"
+  },
+  "SEBI_Reforms": {
+    "tailwind_sectors": ["Financial Services"],
+    "tailwind_tickers": ["BSE.NS", "CDSL.NS", "CAMS.NS"],
+    "keywords": ["SEBI regulation", "F&O regulation", "market reform", "SEBI circular"],
+    "impact": "medium"
+  },
+  "Food_Processing": {
+    "tailwind_sectors": ["Consumer Defensive"],
+    "tailwind_tickers": ["NESTLE.NS", "BRITANNIA.NS", "TATACONSUM.NS", "DABUR.NS"],
+    "keywords": ["food processing PLI", "PMKSY", "cold chain", "food park"],
+    "impact": "low"
+  },
+  "Telecom_Reform": {
+    "tailwind_sectors": ["Communication Services"],
+    "tailwind_tickers": ["BHARTIARTL.NS", "JIOFIN.NS"],
+    "headwind_tickers": ["VODAIDEA.NS"],
+    "keywords": ["telecom reform", "spectrum auction", "5G rollout", "AGR relief"],
+    "impact": "medium"
+  },
+  "Real_Estate_RERA": {
+    "tailwind_sectors": ["Real Estate"],
+    "tailwind_tickers": ["DLF.NS", "GODREJPROP.NS", "OBEROIRLTY.NS", "LODHA.NS"],
+    "keywords": ["RERA", "real estate regulation", "housing policy", "PMAY"],
+    "impact": "medium"
+  }
+}

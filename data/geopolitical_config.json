@@ -1,0 +1,88 @@
+{
+  "sector_profiles": {
+    "Technology": {
+      "trade_risk": {"export_sensitivity": 0.9, "china_plus_one_benefit": 0.3, "import_dependency": 0.2},
+      "policy_risk": {"regulatory_sensitivity": 0.4, "govt_scheme_dependency": 0.3, "rate_sensitivity": 0.3},
+      "commodity_risk": {"crude_sensitivity": 0.2, "raw_material_import": 0.2},
+      "event_risk": {"monsoon_sensitivity": 0.1, "election_sensitivity": 0.3}
+    },
+    "Financial Services": {
+      "trade_risk": {"export_sensitivity": 0.2, "china_plus_one_benefit": 0.1, "import_dependency": 0.1},
+      "policy_risk": {"regulatory_sensitivity": 0.9, "govt_scheme_dependency": 0.4, "rate_sensitivity": 0.9},
+      "commodity_risk": {"crude_sensitivity": 0.3, "raw_material_import": 0.1},
+      "event_risk": {"monsoon_sensitivity": 0.4, "election_sensitivity": 0.6}
+    },
+    "Healthcare": {
+      "trade_risk": {"export_sensitivity": 0.7, "china_plus_one_benefit": 0.6, "import_dependency": 0.6},
+      "policy_risk": {"regulatory_sensitivity": 0.8, "govt_scheme_dependency": 0.5, "rate_sensitivity": 0.3},
+      "commodity_risk": {"crude_sensitivity": 0.3, "raw_material_import": 0.5},
+      "event_risk": {"monsoon_sensitivity": 0.1, "election_sensitivity": 0.4}
+    },
+    "Consumer Cyclical": {
+      "trade_risk": {"export_sensitivity": 0.3, "china_plus_one_benefit": 0.4, "import_dependency": 0.4},
+      "policy_risk": {"regulatory_sensitivity": 0.3, "govt_scheme_dependency": 0.3, "rate_sensitivity": 0.5},
+      "commodity_risk": {"crude_sensitivity": 0.5, "raw_material_import": 0.5},
+      "event_risk": {"monsoon_sensitivity": 0.7, "election_sensitivity": 0.5}
+    },
+    "Consumer Defensive": {
+      "trade_risk": {"export_sensitivity": 0.2, "china_plus_one_benefit": 0.2, "import_dependency": 0.3},
+      "policy_risk": {"regulatory_sensitivity": 0.3, "govt_scheme_dependency": 0.2, "rate_sensitivity": 0.3},
+      "commodity_risk": {"crude_sensitivity": 0.4, "raw_material_import": 0.4},
+      "event_risk": {"monsoon_sensitivity": 0.8, "election_sensitivity": 0.4}
+    },
+    "Industrials": {
+      "trade_risk": {"export_sensitivity": 0.4, "china_plus_one_benefit": 0.6, "import_dependency": 0.5},
+      "policy_risk": {"regulatory_sensitivity": 0.4, "govt_scheme_dependency": 0.7, "rate_sensitivity": 0.6},
+      "commodity_risk": {"crude_sensitivity": 0.6, "raw_material_import": 0.6},
+      "event_risk": {"monsoon_sensitivity": 0.3, "election_sensitivity": 0.6}
+    },
+    "Basic Materials": {
+      "trade_risk": {"export_sensitivity": 0.5, "china_plus_one_benefit": 0.5, "import_dependency": 0.4},
+      "policy_risk": {"regulatory_sensitivity": 0.5, "govt_scheme_dependency": 0.4, "rate_sensitivity": 0.5},
+      "commodity_risk": {"crude_sensitivity": 0.7, "raw_material_import": 0.7},
+      "event_risk": {"monsoon_sensitivity": 0.2, "election_sensitivity": 0.4}
+    },
+    "Energy": {
+      "trade_risk": {"export_sensitivity": 0.3, "china_plus_one_benefit": 0.1, "import_dependency": 0.8},
+      "policy_risk": {"regulatory_sensitivity": 0.7, "govt_scheme_dependency": 0.6, "rate_sensitivity": 0.4},
+      "commodity_risk": {"crude_sensitivity": 0.95, "raw_material_import": 0.8},
+      "event_risk": {"monsoon_sensitivity": 0.1, "election_sensitivity": 0.5}
+    },
+    "Communication Services": {
+      "trade_risk": {"export_sensitivity": 0.2, "china_plus_one_benefit": 0.2, "import_dependency": 0.3},
+      "policy_risk": {"regulatory_sensitivity": 0.8, "govt_scheme_dependency": 0.5, "rate_sensitivity": 0.5},
+      "commodity_risk": {"crude_sensitivity": 0.2, "raw_material_import": 0.2},
+      "event_risk": {"monsoon_sensitivity": 0.1, "election_sensitivity": 0.5}
+    },
+    "Utilities": {
+      "trade_risk": {"export_sensitivity": 0.1, "china_plus_one_benefit": 0.1, "import_dependency": 0.4},
+      "policy_risk": {"regulatory_sensitivity": 0.8, "govt_scheme_dependency": 0.7, "rate_sensitivity": 0.6},
+      "commodity_risk": {"crude_sensitivity": 0.6, "raw_material_import": 0.5},
+      "event_risk": {"monsoon_sensitivity": 0.3, "election_sensitivity": 0.5}
+    },
+    "Real Estate": {
+      "trade_risk": {"export_sensitivity": 0.1, "china_plus_one_benefit": 0.1, "import_dependency": 0.3},
+      "policy_risk": {"regulatory_sensitivity": 0.6, "govt_scheme_dependency": 0.5, "rate_sensitivity": 0.9},
+      "commodity_risk": {"crude_sensitivity": 0.4, "raw_material_import": 0.5},
+      "event_risk": {"monsoon_sensitivity": 0.2, "election_sensitivity": 0.7}
+    },
+    "Automobiles": {
+      "trade_risk": {"export_sensitivity": 0.4, "china_plus_one_benefit": 0.5, "import_dependency": 0.4},
+      "policy_risk": {"regulatory_sensitivity": 0.5, "govt_scheme_dependency": 0.6, "rate_sensitivity": 0.6},
+      "commodity_risk": {"crude_sensitivity": 0.7, "raw_material_import": 0.6},
+      "event_risk": {"monsoon_sensitivity": 0.6, "election_sensitivity": 0.5}
+    }
+  },
+  "default_profile": {
+    "trade_risk": {"export_sensitivity": 0.3, "china_plus_one_benefit": 0.3, "import_dependency": 0.3},
+    "policy_risk": {"regulatory_sensitivity": 0.5, "govt_scheme_dependency": 0.3, "rate_sensitivity": 0.5},
+    "commodity_risk": {"crude_sensitivity": 0.4, "raw_material_import": 0.4},
+    "event_risk": {"monsoon_sensitivity": 0.3, "election_sensitivity": 0.4}
+  },
+  "dimension_weights": {
+    "trade_risk": 0.25,
+    "policy_risk": 0.25,
+    "commodity_risk": 0.25,
+    "event_risk": 0.25
+  }
+}
