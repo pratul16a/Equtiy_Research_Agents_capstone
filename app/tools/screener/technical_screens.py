@@ -1,4 +1,4 @@
-"""Technical / price screens — 200 DMA, volume breakout, RSI, weekly MA alignment."""
+"""Technical / price screens — 200 DMA, golden alignment, MACD, OBV, volume breakout, RSI, weekly MA."""
 
 from __future__ import annotations
 
@@ -53,6 +53,217 @@ def screen_above_200dma(
     return results
 
 
+# ── Golden Alignment (50 DMA > 200 DMA) ────────────────────
+
+
+def screen_golden_alignment(
+    price_df: pd.DataFrame,
+    sector_map: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Screen for stocks where Price > 50 DMA > 200 DMA (golden cross alignment).
+
+    All timeframes aligned bullish — stronger than just being above 200 DMA.
+    """
+    results: list[dict] = []
+
+    for ticker in price_df.columns:
+        try:
+            series = price_df[ticker].dropna()
+            if len(series) < 200:
+                continue
+
+            current_price = float(series.iloc[-1])
+            dma_50 = float(series.rolling(50).mean().iloc[-1])
+            dma_200 = float(series.rolling(200).mean().iloc[-1])
+
+            if any(pd.isna(v) or v <= 0 for v in [dma_50, dma_200]):
+                continue
+
+            if current_price > dma_50 > dma_200:
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "current_price": round(current_price, 2),
+                    "dma_50": round(dma_50, 2),
+                    "dma_200": round(dma_200, 2),
+                    "passed": True,
+                })
+        except Exception as e:
+            logger.debug("Golden alignment check failed for %s: %s", ticker, e)
+
+    logger.info("Golden alignment screen: %d stocks passed", len(results))
+    return results
+
+
+# ── Near 52-Week High ───────────────────────────────────────
+
+
+def screen_near_52w_high(
+    price_df: pd.DataFrame,
+    sector_map: dict[str, str],
+    threshold: float = 0.10,
+) -> list[dict[str, Any]]:
+    """Screen for stocks within `threshold` (default 10%) of their 52-week high.
+
+    Near highs = strength, not weakness. Breakout candidates.
+    """
+    results: list[dict] = []
+
+    for ticker in price_df.columns:
+        try:
+            series = price_df[ticker].dropna()
+            if len(series) < 200:
+                continue
+
+            high_52w = float(series.tail(252).max())
+            current_price = float(series.iloc[-1])
+
+            if high_52w <= 0:
+                continue
+
+            pct_from_high = (high_52w - current_price) / high_52w
+            if pct_from_high <= threshold:
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "current_price": round(current_price, 2),
+                    "high_52w": round(high_52w, 2),
+                    "pct_from_high": round(pct_from_high * 100, 2),
+                    "passed": True,
+                })
+        except Exception as e:
+            logger.debug("Near 52W high check failed for %s: %s", ticker, e)
+
+    logger.info("Near 52W high screen (within %s%%): %d stocks passed", threshold * 100, len(results))
+    return results
+
+
+# ── MACD Bullish ────────────────────────────────────────────
+
+
+def screen_macd_bullish(
+    price_df: pd.DataFrame,
+    sector_map: dict[str, str],
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+) -> list[dict[str, Any]]:
+    """Screen for stocks where MACD line is above signal line (bullish momentum).
+
+    MACD(12,26,9) — standard parameters.
+    """
+    results: list[dict] = []
+
+    for ticker in price_df.columns:
+        try:
+            series = price_df[ticker].dropna()
+            if len(series) < slow + signal + 10:
+                continue
+
+            ema_fast = series.ewm(span=fast, adjust=False).mean()
+            ema_slow = series.ewm(span=slow, adjust=False).mean()
+            macd_line = ema_fast - ema_slow
+            signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+            histogram = macd_line - signal_line
+
+            macd_val = float(macd_line.iloc[-1])
+            signal_val = float(signal_line.iloc[-1])
+            hist_val = float(histogram.iloc[-1])
+
+            if pd.isna(macd_val) or pd.isna(signal_val):
+                continue
+
+            if macd_val > signal_val:
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "macd": round(macd_val, 2),
+                    "signal_line": round(signal_val, 2),
+                    "histogram": round(hist_val, 2),
+                    "passed": True,
+                })
+        except Exception as e:
+            logger.debug("MACD bullish check failed for %s: %s", ticker, e)
+
+    logger.info("MACD bullish screen: %d stocks passed", len(results))
+    return results
+
+
+# ── OBV Rising ──────────────────────────────────────────────
+
+
+def screen_obv_rising(
+    price_df: pd.DataFrame,
+    sector_map: dict[str, str],
+    volume_df: pd.DataFrame | None = None,
+    lookback: int = 20,
+) -> list[dict[str, Any]]:
+    """Screen for stocks where On-Balance Volume is rising over `lookback` days.
+
+    Cumulative volume confirms price trend isn't hollow.
+    Needs volume data — pass `volume_df` or it will be downloaded.
+    """
+    # Get volume data
+    if volume_df is None:
+        tickers = list(price_df.columns)
+        cache_key = f"volume_data:{len(tickers)}"
+        volume_df = cache_get(cache_key)
+        if volume_df is None:
+            batches = [tickers[i:i + _BATCH_SIZE] for i in range(0, len(tickers), _BATCH_SIZE)]
+            frames: list[pd.DataFrame] = []
+            for batch in batches:
+                df = _download_volume_batch(batch)
+                if not df.empty:
+                    frames.append(df)
+            volume_df = pd.concat(frames, axis=1) if frames else pd.DataFrame()
+            if not volume_df.empty:
+                volume_df = volume_df.loc[:, ~volume_df.columns.duplicated()]
+                cache_set(cache_key, volume_df, ttl=600)
+
+    results: list[dict] = []
+
+    for ticker in price_df.columns:
+        try:
+            if ticker not in volume_df.columns:
+                continue
+
+            price_series = price_df[ticker].dropna()
+            vol_series = volume_df[ticker].dropna()
+
+            # Align on common dates
+            common = price_series.index.intersection(vol_series.index)
+            if len(common) < lookback + 5:
+                continue
+
+            prices = price_series.loc[common]
+            volumes = vol_series.loc[common]
+
+            # Compute OBV
+            price_change = prices.diff()
+            signed_volume = volumes.copy()
+            signed_volume[price_change < 0] = -signed_volume[price_change < 0]
+            signed_volume[price_change == 0] = 0
+            obv = signed_volume.cumsum()
+
+            obv_now = float(obv.iloc[-1])
+            obv_ago = float(obv.iloc[-lookback])
+
+            if obv_now > obv_ago:
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "obv_current": int(obv_now),
+                    "obv_20d_ago": int(obv_ago),
+                    "obv_change_pct": round((obv_now - obv_ago) / max(abs(obv_ago), 1) * 100, 2),
+                    "passed": True,
+                })
+        except Exception as e:
+            logger.debug("OBV rising check failed for %s: %s", ticker, e)
+
+    logger.info("OBV rising screen (%dd): %d stocks passed", lookback, len(results))
+    return results
+
+
 def _download_volume_batch(tickers: list[str], period: str = "3mo") -> pd.DataFrame:
     """Download volume data for a batch of tickers."""
     yfinance_rate_limiter.wait()
@@ -76,23 +287,10 @@ def _download_volume_batch(tickers: list[str], period: str = "3mo") -> pd.DataFr
 def screen_volume_breakout(
     tickers: list[str],
     sector_map: dict[str, str],
-    preloaded_price_df: pd.DataFrame | None = None,
+    preloaded_volume_df: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
     """Screen for stocks where 5-day avg volume > 2x 50-day avg volume."""
-    # Try to extract volume from pre-downloaded price_df to avoid duplicate downloads
-    volume_df = None
-    if preloaded_price_df is not None:
-        try:
-            if isinstance(preloaded_price_df.columns, pd.MultiIndex):
-                vol = preloaded_price_df.xs("Volume", level=0, axis=1)
-            elif "Volume" in preloaded_price_df.columns:
-                vol = preloaded_price_df[["Volume"]]
-            else:
-                vol = None
-            if vol is not None and not vol.empty:
-                volume_df = vol
-        except Exception:
-            pass
+    volume_df = preloaded_volume_df
 
     if volume_df is None:
         cache_key = f"volume_data:{len(tickers)}"

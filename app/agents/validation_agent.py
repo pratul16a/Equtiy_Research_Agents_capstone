@@ -35,32 +35,32 @@ def _detect_contradictions(
             usp = usp_cards[ticker]
 
             # Momentum stock with bad promoter score
-            if cat_name == "B":
+            if cat_name == "Momentum":
                 promoter = usp.get("promoter", {})
                 if promoter.get("score", 100) < 35:
                     alerts.append({
                         "ticker": ticker,
-                        "category": "B (Momentum)",
+                        "category": "Momentum",
                         "dimension": "promoter",
                         "score": promoter.get("score", 0),
                         "alert_text": (
-                            f"{ticker} passed Cat B (Momentum) but Promoter Score "
+                            f"{ticker} passed Momentum screen but Promoter Score "
                             f"{promoter.get('score', 0)}/100 — governance concern. "
                             f"Debate agents will address this."
                         ),
                     })
 
-            # Value stock with bad management credibility
-            if cat_name == "C":
+            # Value Bottom stock with bad management credibility
+            if cat_name == "ValueBottom":
                 mgmt = usp.get("mgmt_credibility", {})
                 if mgmt.get("score", 100) < 30:
                     alerts.append({
                         "ticker": ticker,
-                        "category": "C (Value Bottoms)",
+                        "category": "Value Bottom",
                         "dimension": "mgmt_credibility",
                         "score": mgmt.get("score", 0),
                         "alert_text": (
-                            f"{ticker} passed Cat C (Value Bottoms) but Management Credibility "
+                            f"{ticker} passed Value Bottom screen but Management Credibility "
                             f"{mgmt.get('score', 0)}/100 — turnaround may not materialize."
                         ),
                     })

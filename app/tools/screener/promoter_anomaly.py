@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 
 from app.tools.screener.batch_fundamentals import fetch_ticker_financials
-from app.tools.screener.qualitative import _fetch_bse_announcements
+from app.tools.screener.qualitative import _get_all_news
 
 logger = logging.getLogger(__name__)
 
@@ -96,12 +96,12 @@ def detect_related_party_anomaly(ticker: str) -> dict[str, Any]:
     result = {"rpt_count": 0, "has_anomaly": False, "headlines": []}
 
     try:
-        announcements = _fetch_bse_announcements(base_name)
+        all_news = _get_all_news(ticker)
         rpt_count = 0
         rpt_headlines: list[str] = []
 
-        for ann in announcements:
-            headline = ann.get("headline", "")
+        for article in all_news:
+            headline = f"{article.get('title', '')} {article.get('summary', '')}"
             if _RELATED_PARTY_PATTERN.search(headline):
                 rpt_count += 1
                 rpt_headlines.append(headline)

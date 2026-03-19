@@ -404,6 +404,78 @@ def get_sector_outperformers(
     return result
 
 
+# ── Sector Rotation Signal ───────────────────────────────────
+
+
+def screen_sector_rotation_signal(
+    price_df: pd.DataFrame,
+    sector_map: dict[str, list[str]],
+    benchmark_ticker: str = "^CRSLDX",
+) -> list[dict[str, Any]]:
+    """Identify sectors turning positive: rs_1m > 0 AND rs_3m < 0.
+
+    These sectors are inflecting from underperformance to outperformance,
+    signaling potential sector rotation — early entry opportunity.
+    """
+    sector_rs = compute_sector_relative_strength(price_df, sector_map, benchmark_ticker)
+
+    results: list[dict[str, Any]] = []
+    for row in sector_rs:
+        rs_1m = row.get("rs_1m", 0)
+        rs_3m = row.get("rs_3m", 0)
+        if rs_1m > 0 and rs_3m < 0:
+            results.append({
+                "sector": row["sector"],
+                "rs_1m": rs_1m,
+                "rs_3m": rs_3m,
+                "abs_1m": row.get("abs_1m", 0),
+                "abs_3m": row.get("abs_3m", 0),
+                "signal": "rotation_turning_positive",
+            })
+
+    logger.info("Sector rotation signal: %d sectors inflecting positive", len(results))
+    return results
+
+
+def screen_sector_highs_gt_lows(
+    price_df: pd.DataFrame,
+    t2s: dict[str, str],
+    threshold_pct: float = 0.05,
+) -> list[dict[str, Any]]:
+    """Screen: sectors where stocks near 52W high outnumber stocks near 52W low.
+
+    Returns list of stock dicts for tickers in passing sectors.
+    """
+    sector_highs: dict[str, int] = {}
+    sector_lows: dict[str, int] = {}
+
+    for ticker in price_df.columns:
+        series = price_df[ticker].dropna()
+        if len(series) < 20:
+            continue
+        current = float(series.iloc[-1])
+        high_52w = float(series.max())
+        low_52w = float(series.min())
+        sector = t2s.get(ticker, "Other")
+
+        if current >= (1 - threshold_pct) * high_52w:
+            sector_highs[sector] = sector_highs.get(sector, 0) + 1
+        if current <= (1 + threshold_pct) * low_52w:
+            sector_lows[sector] = sector_lows.get(sector, 0) + 1
+
+    passing_sectors = {
+        s for s in set(list(sector_highs.keys()) + list(sector_lows.keys()))
+        if sector_highs.get(s, 0) > sector_lows.get(s, 0)
+    }
+
+    results = [
+        {"ticker": t, "sector": t2s.get(t, "Other"), "passed": True}
+        for t in price_df.columns if t2s.get(t) in passing_sectors
+    ]
+    logger.info("Sector highs>lows: %d sectors passing, %d stocks", len(passing_sectors), len(results))
+    return results
+
+
 # ── Orchestrator ─────────────────────────────────────────────
 
 

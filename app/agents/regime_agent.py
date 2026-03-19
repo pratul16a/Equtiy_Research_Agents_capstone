@@ -18,12 +18,12 @@ from app.config import get_llm
 
 logger = logging.getLogger(__name__)
 
-# Weight multipliers per regime
+# Weight multipliers per regime (2-category: Momentum + ValueBottom)
 REGIME_WEIGHTS = {
-    "bull": {"A": 1.0, "B": 1.3, "C": 0.7},
-    "bear": {"A": 1.0, "B": 0.7, "C": 1.3},
-    "rotation": {"A": 1.3, "B": 1.0, "C": 1.0},
-    "mixed": {"A": 1.0, "B": 1.0, "C": 1.0},
+    "bull": {"Momentum": 1.3, "ValueBottom": 0.7},
+    "bear": {"Momentum": 0.7, "ValueBottom": 1.3},
+    "rotation": {"Momentum": 1.0, "ValueBottom": 1.0},
+    "mixed": {"Momentum": 1.0, "ValueBottom": 1.0},
 }
 
 

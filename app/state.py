@@ -18,16 +18,18 @@ from langchain_core.messages import BaseMessage
 
 
 class ScreenerState(TypedDict, total=False):
-    """State for the 3-category screening + USP + debate pipeline.
+    """State for the 2-category screening + USP + debate pipeline.
 
     Flow:
-        regime_agent → [cat_a, cat_b, cat_c] (fan-out) → merge → validation → debate → END
+        regime_agent → [momentum, value_bottom] (fan-out) → merge → validation → debate → END
     """
 
     # ── Shared data (populated during universe loading) ──
     price_df: Any                                        # pandas DataFrame of batch prices
     bulk_info: dict[str, dict]                           # {ticker: yfinance .info dict}
     t2s: dict[str, str]                                  # {ticker: sector_name}
+    sector_map: dict[str, list[str]]                     # {sector: [tickers]}
+    filtered_tickers: list[str]                          # tickers surviving tech pre-filter
 
     # ── Phase 1: Market Regime ──
     regime: dict[str, Any]                               # {regime, reasoning, weights, vix, nifty_data}
@@ -141,6 +143,8 @@ def create_screener_state(
         "price_df": None,
         "bulk_info": {},
         "t2s": {},
+        "sector_map": {},
+        "filtered_tickers": [],
         "regime": {},
         "category_results": [],
         "recommended_tickers": [],

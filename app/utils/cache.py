@@ -190,9 +190,10 @@ def disk_cache_get(key: str) -> Any | None:
 def disk_cache_set(key: str, value: Any, ttl: int = DISK_CACHE_TTL) -> None:
     """Store a value in the SQLite disk cache."""
     try:
+        # Pickle OUTSIDE the lock to avoid blocking other threads
+        blob = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
         with _disk_cache_lock:
             conn = _get_disk_conn()
-            blob = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
             conn.execute(
                 "INSERT OR REPLACE INTO cache (key, value, expiry) VALUES (?, ?, ?)",
                 (key, blob, time.time() + ttl),
@@ -236,6 +237,11 @@ class RateLimiter:
             if elapsed < self._min_interval:
                 time.sleep(self._min_interval - elapsed)
             self._last_call = time.time()
+
+    def reset(self) -> None:
+        """Reset state for a fresh run (avoids stale timestamps)."""
+        with self._lock:
+            self._last_call = 0.0
 
 
 # Global rate limiter for yfinance calls (10 calls/sec — raised from 5)

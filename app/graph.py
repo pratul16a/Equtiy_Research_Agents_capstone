@@ -1,7 +1,7 @@
 """LangGraph workflows for Indian equity research.
 
 Two graphs:
-    1. screener_graph — Regime → Fan-out(3 categories) → Fan-in → USP+RAG → Debate → END
+    1. screener_graph — Regime → Fan-out(2 categories) → Fan-in → USP+RAG → Debate → END
     2. deep_dive_graph — Data → Analysis → Sentiment → Report → END (existing pipeline)
 """
 
@@ -24,38 +24,43 @@ def _load_universe_node(state: dict) -> dict:
     import pandas as pd
     import yfinance as yf
 
-    from app.tools.market_breadth import get_nifty_constituents
+    from app.tools.market_breadth import get_nifty_constituents, fetch_bulk_price_data, _all_tickers, _ticker_to_sector
     from app.tools.screener.batch_fundamentals import fetch_bulk_info
+    from app.tools.screener.technical_screens import screen_above_200dma, screen_rsi_range
 
     sector_map = get_nifty_constituents()
 
     # Build ticker list and ticker-to-sector mapping
-    all_tickers: list[str] = []
-    t2s: dict[str, str] = {}
-    seen: set[str] = set()
-    for sector, tickers in sector_map.items():
-        for t in tickers:
-            if t not in seen:
-                seen.add(t)
-                all_tickers.append(t)
-                t2s[t] = sector
+    all_tickers = _all_tickers(sector_map)
+    t2s = _ticker_to_sector(sector_map)
 
     logger.info("Universe: %d tickers across %d sectors", len(all_tickers), len(sector_map))
 
-    # Batch download prices (~10s for 500 tickers)
-    try:
-        price_df = yf.download(all_tickers, period="1y", progress=False)
-    except Exception as e:
-        logger.error("Batch price download failed: %s", e)
-        price_df = pd.DataFrame()
+    # Batch download prices
+    price_df = fetch_bulk_price_data(all_tickers, period="1y")
 
-    # Fetch bulk fundamentals
-    bulk_info = fetch_bulk_info(all_tickers)
+    # Technical pre-filter
+    tech_survivors: set[str] = set()
+    above_200 = screen_above_200dma(price_df, t2s)
+    tech_survivors.update(s["ticker"] for s in above_200)
+    rsi_mid = screen_rsi_range(price_df, t2s, lo=20, hi=80)
+    tech_survivors.update(s["ticker"] for s in rsi_mid)
+
+    if len(tech_survivors) < len(all_tickers) * 0.3:
+        tech_survivors = set(all_tickers)
+
+    filtered_tickers = list(tech_survivors)
+    logger.info("Tech pre-filter: %d → %d tickers", len(all_tickers), len(filtered_tickers))
+
+    # Fetch bulk fundamentals for survivors
+    bulk_info = fetch_bulk_info(filtered_tickers)
 
     return {
         "price_df": price_df,
         "bulk_info": bulk_info,
         "t2s": t2s,
+        "sector_map": sector_map,
+        "filtered_tickers": filtered_tickers,
     }
 
 
@@ -80,16 +85,15 @@ def build_screener_graph():
     """Build the screening pipeline graph.
 
     Flow:
-        load_universe → regime → [cat_a, cat_b, cat_c] (fan-out)
+        load_universe → regime → [momentum, value_bottom] (fan-out)
                       → merge_categories (fan-in)
                       → [validation, rag_ingest] (parallel)
                       → debate → END
     """
     from app.agents.regime_agent import regime_node
     from app.agents.category_agents import (
-        cat_a_node,
-        cat_b_node,
-        cat_c_node,
+        momentum_node,
+        value_bottom_node,
         merge_categories_node,
     )
     from app.agents.validation_agent import validation_node
@@ -100,9 +104,8 @@ def build_screener_graph():
     # Add nodes
     workflow.add_node("load_universe", _load_universe_node)
     workflow.add_node("regime", regime_node)
-    workflow.add_node("cat_a", cat_a_node)
-    workflow.add_node("cat_b", cat_b_node)
-    workflow.add_node("cat_c", cat_c_node)
+    workflow.add_node("momentum", momentum_node)
+    workflow.add_node("value_bottom", value_bottom_node)
     workflow.add_node("merge_categories", merge_categories_node)
     workflow.add_node("validation", validation_node)
     workflow.add_node("rag_ingest", _rag_ingest_node)
@@ -112,15 +115,13 @@ def build_screener_graph():
     workflow.set_entry_point("load_universe")
     workflow.add_edge("load_universe", "regime")
 
-    # Regime → fan-out to 3 categories
-    workflow.add_edge("regime", "cat_a")
-    workflow.add_edge("regime", "cat_b")
-    workflow.add_edge("regime", "cat_c")
+    # Regime → fan-out to 2 categories
+    workflow.add_edge("regime", "momentum")
+    workflow.add_edge("regime", "value_bottom")
 
-    # Fan-in: all 3 categories merge
-    workflow.add_edge("cat_a", "merge_categories")
-    workflow.add_edge("cat_b", "merge_categories")
-    workflow.add_edge("cat_c", "merge_categories")
+    # Fan-in: both categories merge
+    workflow.add_edge("momentum", "merge_categories")
+    workflow.add_edge("value_bottom", "merge_categories")
 
     # After merge: USP validation + RAG ingestion in parallel
     workflow.add_edge("merge_categories", "validation")
@@ -137,7 +138,7 @@ def build_screener_graph():
 
 
 def run_screener(categories: list[str] | None = None) -> dict:
-    """Run the full 3-category screening + USP + debate pipeline."""
+    """Run the full 2-category screening + USP + debate pipeline."""
     from app.state import create_screener_state
 
     graph = build_screener_graph()

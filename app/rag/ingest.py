@@ -24,6 +24,7 @@ def load_documents(docs_dir: str | None = None) -> list:
     all_docs = []
 
     # Load PDFs
+    
     pdf_files = list(docs_path.glob("*.pdf"))
     if pdf_files:
         from langchain_community.document_loaders import PyPDFLoader

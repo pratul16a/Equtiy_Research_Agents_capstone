@@ -18,42 +18,222 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ───────────────────────────────────────────────
+# ── Custom CSS — Dark Terminal Theme ─────────────────────────
 st.markdown("""
 <style>
+    /* ── Global dark overrides ─────────────────── */
+    .stApp { background-color: #0E1117; }
+    section[data-testid="stSidebar"] { background-color: #0D1117; border-right: 1px solid #1E2A3A; }
+    .stTabs [data-baseweb="tab-list"] { background-color: #1A1F2E; border-radius: 8px; padding: 4px; gap: 4px; }
+    .stTabs [data-baseweb="tab"] { background-color: transparent; color: #8892A0; border-radius: 6px; }
+    .stTabs [aria-selected="true"] { background-color: #232A3B !important; color: #00D4AA !important; }
+    hr { border-color: #1E2A3A !important; }
+
+    /* DataFrames */
+    [data-testid="stDataFrame"] th { background-color: #1A1F2E !important; color: #8892A0 !important; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    [data-testid="stDataFrame"] td { background-color: #0E1117 !important; color: #E0E0E0 !important; border-bottom: 1px solid #1E2A3A !important; }
+
+    /* Expanders */
+    .streamlit-expanderHeader { background-color: #1A1F2E !important; border: 1px solid #2D3748; border-radius: 8px; color: #E8ECF1 !important; }
+    .streamlit-expanderContent { background-color: #141922 !important; border: 1px solid #2D3748; border-top: none; }
+    details[data-testid="stExpander"] > summary { background-color: #1A1F2E !important; border-radius: 8px; }
+
+    /* Buttons */
+    .stButton > button[kind="primary"] { background: linear-gradient(135deg, #00D4AA, #00B894) !important; color: #0E1117 !important; font-weight: 700; border: none !important; border-radius: 8px; }
+    .stButton > button[kind="primary"]:hover { background: linear-gradient(135deg, #00E4BA, #00D4AA) !important; box-shadow: 0 0 20px rgba(0, 212, 170, 0.3); }
+    .stButton > button { background: #1A1F2E !important; color: #E0E0E0 !important; border: 1px solid #2D3748 !important; border-radius: 8px; }
+
+    /* Progress bars */
+    .stProgress > div > div { background-color: #1A1F2E !important; border-radius: 4px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0E1117; }
+    ::-webkit-scrollbar-thumb { background: #2D3748; border-radius: 3px; }
+
+    /* ── Component classes ──────────────────────── */
+
+    /* Gradient header */
     .main-header {
-        font-size: 2.2rem;
-        font-weight: 700;
-        color: #1f77b4;
-        margin-bottom: 0;
+        font-size: 2.4rem; font-weight: 800;
+        background: linear-gradient(135deg, #00D4AA, #4DA6FF);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        letter-spacing: -0.02em; margin-bottom: 0;
     }
-    .sub-header {
-        font-size: 1rem;
-        color: #666;
-        margin-top: 0;
-    }
+    .sub-header { font-size: 0.95rem; color: #8892A0; margin-top: 4px; letter-spacing: 0.02em; }
+
+    /* Glassmorphism metric card */
     .metric-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 15px;
-        border-left: 4px solid #1f77b4;
+        background: rgba(26, 31, 46, 0.8);
+        backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(45, 55, 72, 0.6);
+        border-radius: 12px; padding: 20px;
+        transition: all 0.3s ease;
     }
-    .pledge-warning {
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 5px 0;
+    .metric-card:hover {
+        border-color: rgba(0, 212, 170, 0.4);
+        box-shadow: 0 4px 20px rgba(0, 212, 170, 0.1);
+        transform: translateY(-2px);
     }
-    .pledge-danger {
-        background: #f8d7da;
-        border: 1px solid #dc3545;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 5px 0;
+    .metric-card .mc-label {
+        font-size: 11px; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #8892A0; margin-bottom: 6px;
+    }
+    .metric-card .mc-value { font-size: 1.8rem; font-weight: 700; color: #E8ECF1; }
+    .metric-card .mc-delta { font-size: 0.85rem; margin-top: 4px; }
+    .mc-delta-up { color: #00D4AA; }
+    .mc-delta-down { color: #FF4757; }
+
+    /* Section hero */
+    .section-hero {
+        background: linear-gradient(135deg, rgba(0, 212, 170, 0.05), rgba(77, 166, 255, 0.05));
+        border: 1px solid #1E2A3A; border-radius: 12px;
+        padding: 24px 28px; margin-bottom: 24px;
+    }
+    .section-hero h3 { color: #E8ECF1; margin: 0 0 4px 0; font-size: 1.5rem; font-weight: 800; }
+    .section-hero p { color: #8892A0; font-size: 0.9rem; margin: 0; }
+
+    /* Criteria */
+    .criteria-group { background: rgba(26, 31, 46, 0.6); border: 1px solid #2D3748; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+    .criteria-item { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 13px; color: #C0C8D4; }
+    .tag-yours { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(0,212,170,0.15); color: #00D4AA; border: 1px solid rgba(0,212,170,0.3); }
+    .tag-new { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(77,166,255,0.15); color: #4DA6FF; border: 1px solid rgba(77,166,255,0.3); }
+    .tag-deferred { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(136,146,160,0.15); color: #8892A0; border: 1px solid rgba(136,146,160,0.3); }
+    .signal-tag { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 4px; margin-bottom: 4px; letter-spacing: 0.03em; }
+
+    /* Warnings */
+    .pledge-warning { background: rgba(255, 167, 38, 0.1); border: 1px solid rgba(255, 167, 38, 0.3); border-radius: 8px; padding: 10px; margin: 5px 0; color: #FFA726; }
+    .pledge-danger { background: rgba(255, 71, 87, 0.1); border: 1px solid rgba(255, 71, 87, 0.3); border-radius: 8px; padding: 10px; margin: 5px 0; color: #FF4757; }
+
+    /* Regime banner */
+    .regime-banner {
+        background: rgba(26, 31, 46, 0.8); backdrop-filter: blur(10px);
+        border-radius: 12px; padding: 14px 20px; margin-bottom: 20px;
+        display: flex; align-items: center; gap: 12px;
+    }
+
+    /* Debate card */
+    .debate-card {
+        background: rgba(26, 31, 46, 0.7); backdrop-filter: blur(8px);
+        border: 1px solid #2D3748; border-radius: 12px;
+        padding: 20px; margin-bottom: 16px;
+    }
+
+    /* Breadth badge */
+    .breadth-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 20px; border-radius: 20px;
+        font-weight: 700; font-size: 1rem; letter-spacing: 0.03em;
     }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ── Helper: Metric Card ──────────────────────────────────────
+
+def render_metric_card(label: str, value, delta: str = "", delta_up: bool = True, accent: str = "#00D4AA"):
+    """Render a glassmorphism metric card replacing st.metric()."""
+    delta_html = ""
+    if delta:
+        cls = "mc-delta-up" if delta_up else "mc-delta-down"
+        arrow = "▲" if delta_up else "▼"
+        delta_html = f'<div class="mc-delta {cls}">{arrow} {delta}</div>'
+    st.markdown(
+        f'<div class="metric-card" style="border-left: 3px solid {accent};">'
+        f'  <div class="mc-label">{label}</div>'
+        f'  <div class="mc-value">{value}</div>'
+        f'  {delta_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ── Helper: Dark Chart Layout ────────────────────────────────
+
+DARK_COLORWAY = ["#00D4AA", "#4DA6FF", "#FF4757", "#FFA726", "#B388FF", "#00E5FF", "#FF6E7A"]
+
+def dark_chart_layout(fig, height: int = 350, **overrides):
+    """Apply dark terminal theme to a Plotly figure."""
+    base = dict(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#0E1117",
+        height=height,
+        margin=dict(l=20, r=20, t=30, b=20),
+        font=dict(color="#E0E0E0", size=12),
+        colorway=DARK_COLORWAY,
+        xaxis=dict(gridcolor="#1E2A3A", zerolinecolor="#1E2A3A"),
+        yaxis=dict(gridcolor="#1E2A3A", zerolinecolor="#1E2A3A"),
+        hovermode="x unified",
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#8892A0")),
+    )
+    base.update(overrides)
+    fig.update_layout(**base)
+    return fig
+
+
+# ── Criteria Data (Momentum & Value Bottom) ──────────────────
+
+from app.tools.screener.gate_defs import MOMENTUM_GATES, VALUE_GATES, MOMENTUM_OVERALL, VALUE_OVERALL, TIER_CONFIG, TIER_ORDER
+from app.tools.screener.category_screener import MOMENTUM_CRITERIA, VALUE_CRITERIA
+
+_GATE_TYPE_COLORS = {"hard": "#FF4757", "soft": "#FFA726", "bonus": "#4DA6FF"}
+_GATE_TYPE_LABELS = {"hard": "HARD", "soft": "SOFT", "bonus": "BONUS"}
+
+
+def _build_gate_display(gates, criteria_registry):
+    """Build gate-structured display data from gate defs + criteria metadata."""
+    display = []
+    for gate in gates:
+        items = []
+        for key in gate["criteria_keys"]:
+            meta = criteria_registry.get(key, {"label": key})
+            tag = "deferred" if key in gate.get("deferred_keys", []) else (
+                "mandatory" if key in gate.get("mandatory_keys", []) else "active"
+            )
+            items.append((meta.get("label", key), tag, key))
+        display.append({
+            "gate_name": gate["name"],
+            "gate_type": gate["gate_type"],
+            "min_pass": gate["min_pass"],
+            "total": len([k for k in gate["criteria_keys"] if k not in gate.get("deferred_keys", [])]),
+            "items": items,
+        })
+    return display
+
+
+MOM_GATE_DISPLAY = _build_gate_display(MOMENTUM_GATES, MOMENTUM_CRITERIA)
+VAL_GATE_DISPLAY = _build_gate_display(VALUE_GATES, VALUE_CRITERIA)
+
+
+def render_criteria_panel(gate_display: list[dict], accent_color: str = "#00D4AA"):
+    """Render criteria panel organized by gates with type badges."""
+    cols = st.columns(2)
+    for i, gate in enumerate(gate_display):
+        with cols[i % 2]:
+            gtype = gate["gate_type"]
+            gcolor = _GATE_TYPE_COLORS.get(gtype, "#8892A0")
+            glabel = _GATE_TYPE_LABELS.get(gtype, gtype.upper())
+            rule = f"need {gate['min_pass']}/{gate['total']}" if gate["min_pass"] > 0 else "bonus only"
+
+            items_html = ""
+            for text, tag, _key in gate["items"]:
+                if tag == "deferred":
+                    items_html += f'<div class="criteria-item" style="opacity:0.5; font-style:italic;"><span style="color:#8892A0; font-size:12px;">○</span> {text} <span class="tag-deferred">DEFER</span></div>'
+                elif tag == "mandatory":
+                    items_html += f'<div class="criteria-item"><span style="color:{accent_color}; font-size:12px;">&#10003;</span> {text} <span style="color:#FF4757; font-size:10px; font-weight:600;">MUST</span></div>'
+                else:
+                    items_html += f'<div class="criteria-item"><span style="color:{accent_color}; font-size:12px;">&#10003;</span> {text}</div>'
+
+            st.markdown(
+                f'<div class="criteria-group">'
+                f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">'
+                f'<span style="font-size:12px; font-weight:600; color:{accent_color}; letter-spacing:0.03em;">{gate["gate_name"]}</span>'
+                f'<span style="font-size:10px; padding:2px 8px; border-radius:8px; background:{gcolor}20; color:{gcolor}; font-weight:600;">{glabel} · {rule}</span>'
+                f'</div>'
+                f'{items_html}</div>',
+                unsafe_allow_html=True,
+            )
 
 
 # ── Helper Functions ─────────────────────────────────────────
@@ -82,14 +262,21 @@ def safe_get(data, key, default="N/A"):
 
 # ── Sidebar ──────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## Indian Equity Research")
-    st.markdown("Multi-agent system powered by LangGraph")
+    st.markdown(
+        '<div style="text-align:center; padding:16px 0 8px;">'
+        '<span style="font-size:1.6rem; font-weight:800; letter-spacing:0.15em; '
+        'background:linear-gradient(135deg,#00D4AA,#4DA6FF); '
+        '-webkit-background-clip:text; -webkit-text-fill-color:transparent;">'
+        'ALPHA TERMINAL</span>'
+        '<div style="font-size:10px; letter-spacing:0.2em; color:#8892A0; margin-top:2px;">'
+        'NIFTY 500 INTELLIGENCE</div></div>',
+        unsafe_allow_html=True,
+    )
     st.divider()
 
     analysis_mode = st.radio(
-        "Mode",
-        ["Stock Screener", "Stock Analysis", "Market Breadth", "Stock Deep Dive"],
-        horizontal=True,
+        "Navigation",
+        ["Market Breadth", "Momentum Screener", "Value Screener", "Stock Diagnostic", "Stock Deep Dive"],
         key="analysis_mode_radio",
     )
 
@@ -106,65 +293,136 @@ with st.sidebar:
     run_breadth = False
     run_screener = False
     run_deep_dive = False
+    run_diagnostic = False
     run_debate = False
-    selected_cats = ["A", "B", "C"]
+    run_momentum = False
+    run_value = False
+    selected_cats = ["Momentum", "ValueBottom"]
     ticker = ""
     exchange = "NSE"
 
-    if analysis_mode == "Stock Analysis":
-        ticker = st.text_input(
-            "Stock Ticker",
-            value="RELIANCE.NS",
-            max_chars=20,
-            placeholder="e.g., RELIANCE.NS, TCS.NS",
-            help="Enter an Indian stock ticker with .NS (NSE) or .BO (BSE) suffix",
-        ).upper().strip()
-
-        exchange = st.selectbox("Exchange", ["NSE", "BSE"], index=0)
-
-        # Auto-append suffix if missing
-        if ticker and not ticker.endswith((".NS", ".BO")):
-            suffix = ".NS" if exchange == "NSE" else ".BO"
-            ticker = ticker + suffix
-            st.caption(f"Using: **{ticker}**")
-
-        run_full = st.button("Run Full Analysis", type="primary", use_container_width=True)
-
-        st.divider()
-        st.markdown("### Run Individual Agents")
-        col1, col2 = st.columns(2)
-        with col1:
-            run_data = st.button("Data", use_container_width=True)
-            run_sentiment = st.button("Sentiment", use_container_width=True)
-        with col2:
-            run_analysis = st.button("Analysis", use_container_width=True)
-            run_report = st.button("Report", use_container_width=True)
-
-    elif analysis_mode == "Market Breadth":
-        st.markdown("Analyze Nifty 500 market breadth, sector relative strength, and top outperformers.")
+    if analysis_mode == "Market Breadth":
+        st.markdown('<span style="color:#4DA6FF; font-size:11px; letter-spacing:0.1em; font-weight:700;">BREADTH CONTROLS</span>', unsafe_allow_html=True)
+        st.caption("Sector RS, 52W breadth, and top outperformers across Nifty 500.")
         run_breadth = st.button("Run Breadth Analysis", type="primary", use_container_width=True)
+        st.caption("Fetches data for ~500 stocks. First run ~45-60s. Cached for 10 min.")
 
-    elif analysis_mode == "Stock Screener":
-        st.markdown("**3-Category AI Screening** with USP analysis + Bull/Bear debate.")
-
-        screener_categories = st.multiselect(
-            "Categories",
-            ["A: Strengthening Industries", "B: Momentum", "C: Value Bottoms"],
-            default=["A: Strengthening Industries", "B: Momentum", "C: Value Bottoms"],
-            help="Select which screening categories to run.",
+    elif analysis_mode == "Momentum Screener":
+        st.markdown('<span style="color:#00D4AA; font-size:11px; letter-spacing:0.1em; font-weight:700;">MOMENTUM CONTROLS</span>', unsafe_allow_html=True)
+        st.caption("5 gates · 17 criteria · Strong stocks in strong sectors")
+        run_momentum = st.button("Run Momentum Screener", type="primary", use_container_width=True)
+        debate_mode = st.radio(
+            "AI Debate", ["Off", "Quick (RAG + 1 LLM call, ~20s)", "Deep (multi-round GPT-4o, ~2min)"],
+            index=1, horizontal=True, key="mom_debate_mode",
         )
-        # Extract category letters
-        selected_cats = [c[0] for c in screener_categories]
+        run_debate = debate_mode != "Off"
+        st.session_state["_debate_deep"] = "Deep" in debate_mode
 
-        run_debate = st.checkbox("Run AI Debate (top 5 stocks)", value=True,
-                                help="Bull vs Bear debate for top stocks. Adds ~60s.")
+        # ── Gate-organized criteria tree ──
+        _cost_badge = {"fast": "", "medium": " ⏱", "slow": " 🐢"}
+        with st.expander("Filter Criteria (5 Gates)", expanded=False):
+            _mom_selected: set[str] = set()
+            for gate in MOMENTUM_GATES:
+                gcolor = _GATE_TYPE_COLORS.get(gate["gate_type"], "#8892A0")
+                glabel = _GATE_TYPE_LABELS.get(gate["gate_type"], "")
+                st.markdown(
+                    f'<span style="color:{gcolor}; font-size:11px; font-weight:700;">{glabel}</span> '
+                    f'**{gate["name"]}** <span style="color:#8892A0; font-size:11px;">(need {gate["min_pass"]})</span>',
+                    unsafe_allow_html=True,
+                )
+                for k in gate["criteria_keys"]:
+                    meta = MOMENTUM_CRITERIA.get(k, {"label": k, "default": False, "cost": "fast"})
+                    is_deferred = k in gate.get("deferred_keys", [])
+                    is_mandatory = k in gate.get("mandatory_keys", [])
+                    suffix = " [MUST]" if is_mandatory else ""
+                    suffix += " [DEFER]" if is_deferred else ""
+                    checked = st.checkbox(
+                        f"{meta['label']}{_cost_badge.get(meta['cost'], '')}{suffix}",
+                        value=meta["default"] and not is_deferred,
+                        disabled=is_deferred,
+                        key=f"mom_crit_{k}",
+                    )
+                    if checked and not is_deferred:
+                        _mom_selected.add(k)
 
-        run_screener = st.button("Run Category Screener", type="primary", use_container_width=True)
+            n_sel = len(_mom_selected)
+            st.caption(f"{n_sel}/{len(MOMENTUM_CRITERIA)} enabled · Overall threshold: ≥ {MOMENTUM_OVERALL['threshold']}/{MOMENTUM_OVERALL['active_total']}")
+
+        st.session_state["_mom_criteria"] = _mom_selected
+
+        if st.button("Run Both (Momentum + Value)", use_container_width=True, key="run_both_mom"):
+            run_momentum = True
+            st.session_state["_run_both"] = True
+
+    elif analysis_mode == "Value Screener":
+        st.markdown('<span style="color:#4DA6FF; font-size:11px; letter-spacing:0.1em; font-weight:700;">VALUE CONTROLS</span>', unsafe_allow_html=True)
+        st.caption("28 criteria · Turnaround candidates at valuation floors")
+        run_value = st.button("Run Value Screener", type="primary", use_container_width=True)
+        debate_mode = st.radio(
+            "AI Debate", ["Off", "Quick (RAG + 1 LLM call, ~20s)", "Deep (multi-round GPT-4o, ~2min)"],
+            index=1, horizontal=True, key="val_debate_mode",
+        )
+        run_debate = debate_mode != "Off"
+        st.session_state["_debate_deep"] = "Deep" in debate_mode
+
+        # ── Gate-organized criteria tree ──
+        _cost_badge = {"fast": "", "medium": " ⏱", "slow": " 🐢"}
+        with st.expander("Filter Criteria (7 Gates)", expanded=False):
+            _val_selected: set[str] = set()
+            for gate in VALUE_GATES:
+                gcolor = _GATE_TYPE_COLORS.get(gate["gate_type"], "#8892A0")
+                glabel = _GATE_TYPE_LABELS.get(gate["gate_type"], "")
+                st.markdown(
+                    f'<span style="color:{gcolor}; font-size:11px; font-weight:700;">{glabel}</span> '
+                    f'**{gate["name"]}** <span style="color:#8892A0; font-size:11px;">(need {gate["min_pass"]})</span>',
+                    unsafe_allow_html=True,
+                )
+                for k in gate["criteria_keys"]:
+                    meta = VALUE_CRITERIA.get(k, {"label": k, "default": False, "cost": "fast"})
+                    is_deferred = k in gate.get("deferred_keys", [])
+                    is_mandatory = k in gate.get("mandatory_keys", [])
+                    suffix = " [MUST]" if is_mandatory else ""
+                    suffix += " [DEFER]" if is_deferred else ""
+                    checked = st.checkbox(
+                        f"{meta['label']}{_cost_badge.get(meta['cost'], '')}{suffix}",
+                        value=meta["default"] and not is_deferred,
+                        disabled=is_deferred,
+                        key=f"val_crit_{k}",
+                    )
+                    if checked and not is_deferred:
+                        _val_selected.add(k)
+
+            n_sel = len(_val_selected)
+            st.caption(f"{n_sel}/{len(VALUE_CRITERIA)} enabled · Overall threshold: ≥ {VALUE_OVERALL['threshold']}/{VALUE_OVERALL['active_total']}")
+
+        st.session_state["_val_criteria"] = _val_selected
+
+        if st.button("Run Both (Momentum + Value)", use_container_width=True, key="run_both_val"):
+            run_value = True
+            st.session_state["_run_both"] = True
+
+    elif analysis_mode == "Stock Diagnostic":
+        st.markdown('<span style="color:#FFA726; font-size:11px; letter-spacing:0.1em; font-weight:700;">SINGLE STOCK TEST</span>', unsafe_allow_html=True)
+        st.caption("Run ALL screening criteria on one stock. See exactly what passes and fails.")
+        diag_ticker = st.text_input(
+            "Ticker",
+            value="ZAGGLE.NS",
+            max_chars=20,
+            help="Enter BSE/NSE ticker (e.g., ZAGGLE.NS, ALKEM.NS)",
+            key="diag_ticker_input",
+        )
+        diag_exchange = st.selectbox("Exchange", ["NSE", "BSE"], index=0, key="diag_exchange")
+        diag_ticker = diag_ticker.strip().upper()
+        if diag_exchange == "NSE" and not diag_ticker.endswith(".NS"):
+            diag_ticker = f"{diag_ticker}.NS"
+        elif diag_exchange == "BSE" and not diag_ticker.endswith(".BO"):
+            diag_ticker = f"{diag_ticker}.BO"
+        run_diagnostic = st.button("Run Diagnostic", type="primary", use_container_width=True)
 
     elif analysis_mode == "Stock Deep Dive":
-        st.markdown("### Stock Deep Dive")
+        st.markdown('<span style="color:#B388FF; font-size:11px; letter-spacing:0.1em; font-weight:700;">STOCK TICKER</span>', unsafe_allow_html=True)
         dd_ticker = st.text_input(
-            "Stock Ticker",
+            "Ticker",
             value="RELIANCE.NS",
             max_chars=20,
             help="Enter BSE/NSE ticker (e.g., RELIANCE.NS, TCS.NS)",
@@ -180,19 +438,30 @@ with st.sidebar:
 
         run_deep_dive = st.button("Load Stock Profile", type="primary", use_container_width=True)
 
+        # Quick picks from screener results
+        cdata = st.session_state.get("category_screener_data")
+        if cdata:
+            st.markdown("**QUICK PICKS**")
+            cat_results = cdata.get("category_results", {})
+            pick_tickers = []
+            for cat_stocks in cat_results.values():
+                if isinstance(cat_stocks, list):
+                    for s in cat_stocks[:5]:
+                        t = s.get("ticker", "")
+                        if t and t not in pick_tickers:
+                            pick_tickers.append(t)
+            if pick_tickers:
+                cols = st.columns(4)
+                for i, t in enumerate(pick_tickers[:8]):
+                    with cols[i % 4]:
+                        if st.button(t.replace(".NS", "").replace(".BO", ""), key=f"qp_{t}", use_container_width=True):
+                            st.session_state["dd_ticker_input"] = t
+                            st.rerun()
+
     st.divider()
-    st.markdown("### About")
-    st.markdown("""
-    **12-Agent System:**
-    - **Regime Agent** -- Bull/bear/rotation detection
-    - **3 Category Agents** -- Sector, momentum, value screens
-    - **Validation Agent** -- USP scoring (5 dimensions)
-    - **Bull/Bear/Judge** -- AI debate with RAG evidence
-    - **Data Agent** -- Incremental financials & filings
-    - **Analysis Agent** -- ROCE, DCF, peer comparison
-    - **Sentiment Agent** -- Recent news & events
-    - **Report Agent** -- Investment memo synthesis
-    """)
+    st.caption("Built with Streamlit + Claude Code")
+    st.caption("Data: yfinance &middot; BSE &middot; Google News")
+    st.caption("Cache TTL: 10 minutes")
 
 
 # ── Session State Init ───────────────────────────────────────
@@ -208,6 +477,8 @@ if "screener_data" not in st.session_state:
     st.session_state.screener_data = None
 if "category_screener_data" not in st.session_state:
     st.session_state.category_screener_data = None
+if "diagnostic_data" not in st.session_state:
+    st.session_state.diagnostic_data = None
 if "deep_dive_profile" not in st.session_state:
     st.session_state.deep_dive_profile = None
 if "deep_dive_messages" not in st.session_state:
@@ -220,27 +491,31 @@ if "deep_dive_ticker" not in st.session_state:
 
 def render_breadth_overview(breadth: dict):
     """Render 52-week breadth overview metrics."""
-    st.markdown("### Market Breadth Overview")
+    st.markdown(
+        '<div class="section-hero" style="border-left:4px solid #FFA726;">'
+        '<h3>Market Breadth Overview</h3>'
+        '<p>52-week high/low analysis across Nifty 500 universe</p>'
+        '</div>', unsafe_allow_html=True,
+    )
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
-        st.metric("Stocks Analyzed", breadth["total_stocks"])
+        render_metric_card("Stocks Analyzed", breadth["total_stocks"], accent="#4DA6FF")
     with c2:
-        st.metric("At 52W High", breadth["at_52w_high"],
-                   delta=f"{breadth['high_pct']}%", delta_color="normal")
+        render_metric_card("At 52W High", breadth["at_52w_high"],
+                           delta=f"{breadth['high_pct']}%", delta_up=True, accent="#00D4AA")
     with c3:
-        st.metric("At 52W Low", breadth["at_52w_low"],
-                   delta=f"-{breadth['low_pct']}%", delta_color="inverse")
+        render_metric_card("At 52W Low", breadth["at_52w_low"],
+                           delta=f"{breadth['low_pct']}%", delta_up=False, accent="#FF4757")
     with c4:
-        st.metric("High/Low Ratio", breadth["high_low_ratio"])
+        render_metric_card("High/Low Ratio", breadth["high_low_ratio"], accent="#FFA726")
     with c5:
         signal = breadth["breadth_signal"]
-        signal_colors = {"Bullish": "#00c853", "Bearish": "#f44336", "Neutral": "#ff9800"}
-        color = signal_colors.get(signal, "#ff9800")
+        signal_colors = {"Bullish": "#00D4AA", "Bearish": "#FF4757", "Neutral": "#FFA726"}
+        color = signal_colors.get(signal, "#FFA726")
         st.markdown(
-            f'<div style="text-align:center; padding:10px; background:{color}20; '
-            f'border-radius:8px; border:2px solid {color};">'
-            f'<div style="font-size:1.4rem; font-weight:700; color:{color};">{signal}</div>'
-            f'<div style="font-size:0.8rem; color:#666;">Breadth Signal</div></div>',
+            f'<div class="breadth-badge" style="background:{color}15; border:2px solid {color}; '
+            f'justify-content:center; width:100%;">'
+            f'<span style="font-size:1.4rem; color:{color};">{signal}</span></div>',
             unsafe_allow_html=True,
         )
 
@@ -278,7 +553,7 @@ def render_sector_rs_table(sector_rs: list[dict]):
 
     # Horizontal bar chart — 3M RS
     fig = go.Figure()
-    colors = ["#2ca02c" if r.get("rs_3m", 0) > 0 else "#d62728" for r in sector_rs]
+    colors = ["#00D4AA" if r.get("rs_3m", 0) > 0 else "#FF4757" for r in sector_rs]
     fig.add_trace(go.Bar(
         y=[r["sector"] for r in reversed(sector_rs)],
         x=[r["rs_3m"] for r in reversed(sector_rs)],
@@ -287,12 +562,11 @@ def render_sector_rs_table(sector_rs: list[dict]):
         text=[f"{r['rs_3m']:+.1f}%" for r in reversed(sector_rs)],
         textposition="outside",
     ))
-    fig.update_layout(
+    dark_chart_layout(fig,
+        height=max(350, len(sector_rs) * 35),
         title="3-Month Relative Strength by Sector",
         xaxis_title="Relative Strength (%)",
-        height=max(350, len(sector_rs) * 35),
         margin=dict(l=20, r=80, t=40, b=20),
-        template="plotly_white",
     )
     fig.add_vline(x=0, line_dash="dash", line_color="gray")
     st.plotly_chart(fig, use_container_width=True)
@@ -364,13 +638,13 @@ def render_screener_summary(summary: dict):
     st.markdown("### Screening Summary")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("Stocks Screened", summary.get("total_screened", 0))
+        render_metric_card("Stocks Screened", summary.get("total_screened", 0), accent="#4DA6FF")
     with c2:
-        st.metric("Stocks Passing", summary.get("total_passing", 0))
+        render_metric_card("Stocks Passing", summary.get("total_passing", 0), accent="#00D4AA")
     with c3:
-        st.metric("Min Score", summary.get("min_score", 1))
+        render_metric_card("Min Score", summary.get("min_score", 1), accent="#FFA726")
     with c4:
-        st.metric("Top Sector", summary.get("top_sector", "N/A"))
+        render_metric_card("Top Sector", summary.get("top_sector", "N/A"), accent="#B388FF")
 
     # Criteria hit counts
     criteria_hits = summary.get("criteria_hits", {})
@@ -391,13 +665,12 @@ def render_screener_summary(summary: dict):
                 x=list(sector_dist.values()),
                 y=list(sector_dist.keys()),
                 orientation="h",
-                marker_color="#1f77b4",
+                marker_color="#4DA6FF",
             ))
-            fig.update_layout(
+            dark_chart_layout(fig,
                 height=max(250, len(sector_dist) * 30),
                 xaxis_title="Number of Stocks",
                 margin=dict(l=20, r=20, t=10, b=20),
-                template="plotly_white",
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -546,28 +819,28 @@ def render_company_overview(company_info):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         price = safe_get(company_info, "current_price", 0)
-        st.metric("Current Price", f"₹{price:,.2f}" if isinstance(price, (int, float)) else str(price))
+        render_metric_card("Current Price", f"₹{price:,.2f}" if isinstance(price, (int, float)) else str(price), accent="#00D4AA")
     with col2:
         mcap = safe_get(company_info, "market_cap", 0)
-        st.metric("Market Cap", format_inr_display(mcap))
+        render_metric_card("Market Cap", format_inr_display(mcap), accent="#4DA6FF")
     with col3:
         pe = safe_get(company_info, "pe_trailing", 0)
-        st.metric("P/E (Trailing)", f"{pe:.2f}" if isinstance(pe, (int, float)) else str(pe))
+        render_metric_card("P/E (Trailing)", f"{pe:.2f}" if isinstance(pe, (int, float)) else str(pe), accent="#FFA726")
     with col4:
         beta = safe_get(company_info, "beta", 0)
-        st.metric("Beta", f"{beta:.2f}" if isinstance(beta, (int, float)) else str(beta))
+        render_metric_card("Beta", f"{beta:.2f}" if isinstance(beta, (int, float)) else str(beta), accent="#B388FF")
 
     col5, col6, col7, col8 = st.columns(4)
     with col5:
-        st.metric("Sector", safe_get(company_info, "sector"))
+        render_metric_card("Sector", safe_get(company_info, "sector"), accent="#4DA6FF")
     with col6:
-        st.metric("Industry", safe_get(company_info, "industry"))
+        render_metric_card("Industry", safe_get(company_info, "industry"), accent="#B388FF")
     with col7:
         high = safe_get(company_info, "52_week_high", 0)
-        st.metric("52W High", f"₹{high:,.2f}" if isinstance(high, (int, float)) else str(high))
+        render_metric_card("52W High", f"₹{high:,.2f}" if isinstance(high, (int, float)) else str(high), accent="#00D4AA")
     with col8:
         low = safe_get(company_info, "52_week_low", 0)
-        st.metric("52W Low", f"₹{low:,.2f}" if isinstance(low, (int, float)) else str(low))
+        render_metric_card("52W Low", f"₹{low:,.2f}" if isinstance(low, (int, float)) else str(low), accent="#FF4757")
 
     desc = safe_get(company_info, "description", "")
     if desc and desc != "N/A":
@@ -589,28 +862,22 @@ def render_price_chart(financials):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=dates, y=closes, mode="lines+markers",
-        name="Close Price", line=dict(color="#1f77b4", width=2),
+        name="Close Price", line=dict(color="#00D4AA", width=2),
         marker=dict(size=4),
     ))
-    fig.update_layout(
-        height=350,
-        margin=dict(l=20, r=20, t=30, b=20),
-        xaxis_title="Date",
-        yaxis_title="Price (INR)",
-        hovermode="x unified",
-        template="plotly_white",
-    )
+    dark_chart_layout(fig, xaxis_title="Date", yaxis_title="Price (INR)")
     st.plotly_chart(fig, use_container_width=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Period Return", f"{safe_get(price_data, 'period_return_pct', 0):.2f}%")
+        ret = safe_get(price_data, 'period_return_pct', 0)
+        render_metric_card("Period Return", f"{ret:.2f}%", delta_up=isinstance(ret, (int, float)) and ret >= 0, accent="#00D4AA")
     with col2:
-        st.metric("Period High", f"₹{safe_get(price_data, 'period_high', 0):,.2f}")
+        render_metric_card("Period High", f"₹{safe_get(price_data, 'period_high', 0):,.2f}", accent="#00D4AA")
     with col3:
-        st.metric("Period Low", f"₹{safe_get(price_data, 'period_low', 0):,.2f}")
+        render_metric_card("Period Low", f"₹{safe_get(price_data, 'period_low', 0):,.2f}", accent="#FF4757")
     with col4:
-        st.metric("Avg Volume", f"{safe_get(price_data, 'avg_volume', 0):,.0f}")
+        render_metric_card("Avg Volume", f"{safe_get(price_data, 'avg_volume', 0):,.0f}", accent="#4DA6FF")
 
 
 def render_ratios(ratios):
@@ -646,11 +913,11 @@ def render_ratios(ratios):
                 if label == "Roce":
                     label = "ROCE"
                 if fmt_pct and isinstance(v, (int, float)):
-                    st.metric(label, f"{v * 100:.2f}%")
+                    render_metric_card(label, f"{v * 100:.2f}%", accent="#4DA6FF")
                 elif isinstance(v, (int, float)):
-                    st.metric(label, f"{v:.2f}")
+                    render_metric_card(label, f"{v:.2f}", accent="#4DA6FF")
                 else:
-                    st.metric(label, str(v))
+                    render_metric_card(label, str(v), accent="#4DA6FF")
 
     with tab1:
         _render_ratio_tab(valuation)
@@ -675,19 +942,19 @@ def render_indian_metrics(indian_metrics):
         if roce_data and "error" not in roce_data:
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Current ROCE", safe_get(roce_data, "roce_pct", "N/A"))
+                render_metric_card("Current ROCE", safe_get(roce_data, "roce_pct", "N/A"), accent="#00D4AA")
             with col2:
-                st.metric("Quality Rating", safe_get(roce_data, "quality_rating", "N/A"))
+                render_metric_card("Quality Rating", safe_get(roce_data, "quality_rating", "N/A"), accent="#FFA726")
             with col3:
-                st.metric("EBIT (Cr)", f"₹{safe_get(roce_data, 'ebit_crores', 0):,.2f}")
+                render_metric_card("EBIT (Cr)", f"₹{safe_get(roce_data, 'ebit_crores', 0):,.2f}", accent="#4DA6FF")
 
             historical = roce_data.get("historical_roce", [])
             if historical:
                 years = [h["year"][:10] for h in historical]
                 values = [h["roce"] * 100 for h in historical]
                 fig = go.Figure()
-                fig.add_trace(go.Bar(x=years, y=values, marker_color="#ff7f0e", name="ROCE %"))
-                fig.update_layout(height=300, yaxis_title="ROCE %", template="plotly_white")
+                fig.add_trace(go.Bar(x=years, y=values, marker_color="#FFA726", name="ROCE %"))
+                dark_chart_layout(fig, height=300, yaxis_title="ROCE %")
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("ROCE data not available")
@@ -740,17 +1007,17 @@ def render_dcf(dcf):
     col1, col2, col3 = st.columns(3)
     with col1:
         intrinsic = safe_get(dcf, "intrinsic_value_per_share", 0)
-        st.metric("Intrinsic Value", f"₹{intrinsic:,.2f}" if isinstance(intrinsic, (int, float)) else str(intrinsic))
+        render_metric_card("Intrinsic Value", f"₹{intrinsic:,.2f}" if isinstance(intrinsic, (int, float)) else str(intrinsic), accent="#00D4AA")
     with col2:
         current = safe_get(dcf, "current_price", 0)
-        st.metric("Current Price", f"₹{current:,.2f}" if isinstance(current, (int, float)) else str(current))
+        render_metric_card("Current Price", f"₹{current:,.2f}" if isinstance(current, (int, float)) else str(current), accent="#4DA6FF")
     with col3:
         upside = safe_get(dcf, "upside_pct", 0)
         if isinstance(upside, (int, float)):
-            st.metric("Upside/Downside", f"{upside:+.2f}%",
-                       delta=f"{upside:+.2f}%", delta_color="normal")
+            render_metric_card("Upside/Downside", f"{upside:+.2f}%",
+                               delta=f"{upside:+.2f}%", delta_up=upside >= 0, accent="#00D4AA" if upside >= 0 else "#FF4757")
         else:
-            st.metric("Upside/Downside", str(upside))
+            render_metric_card("Upside/Downside", str(upside), accent="#FFA726")
 
     assumptions = dcf.get("assumptions", {})
     if assumptions:
@@ -774,10 +1041,8 @@ def render_dcf(dcf):
         fcfs = [p.get(fcf_key, 0) for p in projected]
 
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=years, y=fcfs, marker_color="#2ca02c", name="Discounted FCF (Cr)"))
-        fig.update_layout(
-            height=300, yaxis_title="Discounted FCF (₹ Crores)", template="plotly_white",
-        )
+        fig.add_trace(go.Bar(x=years, y=fcfs, marker_color="#00D4AA", name="Discounted FCF (Cr)"))
+        dark_chart_layout(fig, height=300, yaxis_title="Discounted FCF (₹ Crores)")
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -829,7 +1094,7 @@ def render_sentiment(sentiment_scores, news_summaries):
             score = sentiment_scores.get("overall_score", 0)
             label = sentiment_scores.get("overall_label", "neutral")
             color_icon = "🟢" if label == "bullish" else "🔴" if label == "bearish" else "🟡"
-            st.metric("Sentiment Score", f"{score:+.2f}")
+            render_metric_card("Sentiment Score", f"{score:+.2f}", accent="#00D4AA" if score >= 0 else "#FF4757")
             st.markdown(f"**{color_icon} {label.upper()}**")
         with col2:
             analysis = sentiment_scores.get("analysis", "")
@@ -941,14 +1206,12 @@ def render_investment_score(score_data):
             text=[f"{s}/100" for s in dim_scores],
             textposition="outside",
         ))
-        fig.add_hline(y=75, line_dash="dash", line_color="green", annotation_text="Strong Buy (75)")
-        fig.add_hline(y=60, line_dash="dash", line_color="lightgreen", annotation_text="Buy (60)")
-        fig.add_hline(y=40, line_dash="dash", line_color="orange", annotation_text="Hold (40)")
-        fig.update_layout(
-            height=350,
+        fig.add_hline(y=75, line_dash="dash", line_color="#00D4AA", annotation_text="Strong Buy (75)", annotation_font_color="#00D4AA")
+        fig.add_hline(y=60, line_dash="dash", line_color="#4DA6FF", annotation_text="Buy (60)", annotation_font_color="#4DA6FF")
+        fig.add_hline(y=40, line_dash="dash", line_color="#FFA726", annotation_text="Hold (40)", annotation_font_color="#FFA726")
+        dark_chart_layout(fig,
             yaxis_title="Score",
             yaxis_range=[0, 110],
-            template="plotly_white",
             showlegend=False,
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -972,7 +1235,7 @@ def render_investment_score(score_data):
                     for i, (sub_name, sub_val) in enumerate(sub_scores.items()):
                         with sub_cols[i % len(sub_cols)]:
                             display_name = sub_name.replace("_", " ").title()
-                            st.metric(display_name, f"{sub_val}/100")
+                            render_metric_card(display_name, f"{sub_val}/100", accent="#B388FF")
 
                 details = dim_data.get("details", {})
                 flag = details.get("pledge_flag", "")
@@ -1143,6 +1406,172 @@ st.markdown('<p class="main-header">Indian Equity Research Analyst</p>', unsafe_
 st.markdown('<p class="sub-header">Multi-agent investment research for NSE/BSE stocks powered by LangGraph + LLM</p>', unsafe_allow_html=True)
 st.divider()
 
+# ── Stock Diagnostic Mode ────────────────────────────────────
+if analysis_mode == "Stock Diagnostic":
+    st.markdown(
+        '<div class="section-hero" style="border-left:4px solid #FFA726;">'
+        '<h3>Single Stock Diagnostic</h3>'
+        '<p>Run ALL screening criteria on one stock · Gate-by-gate pass/fail · Debug your filters</p>'
+        '</div>', unsafe_allow_html=True,
+    )
+
+    if run_diagnostic and diag_ticker:
+        progress_bar = st.progress(0, text=f"Diagnosing {diag_ticker}...")
+
+        def _diag_progress(fraction: float, message: str):
+            progress_bar.progress(min(fraction, 1.0), text=message)
+
+        try:
+            import time as _time
+            _t0 = _time.time()
+            from app.tools.screener.category_screener import run_single_stock_diagnostic
+            st.session_state.diagnostic_data = run_single_stock_diagnostic(
+                diag_ticker, progress_cb=_diag_progress,
+            )
+            progress_bar.empty()
+            st.success(f"Diagnostic complete in {_time.time() - _t0:.1f}s")
+        except Exception as e:
+            progress_bar.empty()
+            st.error(f"Diagnostic failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+    ddata = st.session_state.diagnostic_data
+    if ddata:
+        ticker_name = ddata["ticker"]
+        sector_name = ddata["sector"]
+        info = ddata.get("info", {})
+        company = info.get("shortName", ticker_name)
+        criteria = ddata["criteria_results"]
+        passed_set = ddata["passed_set"]
+
+        # Header
+        st.markdown(
+            f'<div style="background:rgba(255,167,38,0.08); border:1px solid #FFA72640; border-radius:10px; padding:16px; margin-bottom:16px;">'
+            f'<span style="font-size:1.4rem; font-weight:700; color:#FFA726;">{company}</span>'
+            f'<span style="margin-left:16px; color:#8892A0;">{ticker_name} · {sector_name}</span>'
+            f'<span style="margin-left:16px; font-size:1.1rem; color:#00D4AA; font-weight:600;">'
+            f'{len(passed_set)} criteria passed</span>'
+            f'</div>', unsafe_allow_html=True,
+        )
+
+        # Summary cards
+        mom = ddata["momentum"]
+        val = ddata["value"]
+        c1, c2 = st.columns(2)
+        with c1:
+            mom_color = "#00D4AA" if mom["final_pass"] else "#FF4757"
+            mom_label = "PASS" if mom["final_pass"] else "FAIL"
+            render_metric_card(
+                f"Momentum: {mom_label}",
+                f"{mom['score']}/{mom['active_total']}",
+                accent=mom_color,
+            )
+        with c2:
+            val_color = "#00D4AA" if val["final_pass"] else "#FF4757"
+            val_label = "PASS" if val["final_pass"] else "FAIL"
+            render_metric_card(
+                f"Value: {val_label}",
+                f"{val['score']}/{val['active_total']}",
+                accent=val_color,
+            )
+
+        st.divider()
+
+        # Gate-by-gate breakdown for both categories
+        for cat_label, cat_key, cat_data, gates, accent in [
+            ("Momentum", "momentum", mom, MOMENTUM_GATES, "#00D4AA"),
+            ("Value Bottom", "value", val, VALUE_GATES, "#4DA6FF"),
+        ]:
+            pass_label = "PASS" if cat_data["final_pass"] else "FAIL"
+            pass_color = "#00D4AA" if cat_data["final_pass"] else "#FF4757"
+            st.markdown(
+                f'<div style="margin:12px 0 8px 0;">'
+                f'<span style="font-size:1.1rem; font-weight:700; color:{accent};">{cat_label}</span>'
+                f' <span style="color:{pass_color}; font-weight:700; font-size:0.9rem;">{pass_label}</span>'
+                f' <span style="color:#8892A0; font-size:0.85rem;">({cat_data["score"]}/{cat_data["active_total"]}'
+                f', need {MOMENTUM_OVERALL["threshold"] if cat_key == "momentum" else VALUE_OVERALL["threshold"]})</span>'
+                f'</div>', unsafe_allow_html=True,
+            )
+
+            for g in cat_data["gate_details"]:
+                gcolor = _GATE_TYPE_COLORS.get(g["gate_type"], "#8892A0")
+                glabel = _GATE_TYPE_LABELS.get(g["gate_type"], "")
+                status_icon = "✓" if g["passed"] else "✗"
+                status_color = "#00D4AA" if g["passed"] else "#FF4757"
+
+                # Build criteria checks with details
+                checks_html = ""
+                for k in g.get("passed_keys", []):
+                    detail = criteria.get(k, {}).get("detail", {})
+                    detail_str = ""
+                    # Show key metric if available
+                    for dkey in ["asset_turnover", "insider_buys", "match_count", "geo_score",
+                                 "matched_keywords", "piotroski_score", "altman_z", "roe",
+                                 "de_ratio", "rsi", "distance_pct"]:
+                        if dkey in detail:
+                            detail_str = f' ({dkey}={detail[dkey]})'
+                            break
+                    checks_html += (
+                        f'<div style="margin:2px 0 2px 24px; font-size:12px;">'
+                        f'<span style="color:#00D4AA;">✓</span> '
+                        f'<span style="color:#C8D0DA;">{k.replace("_"," ").title()}</span>'
+                        f'<span style="color:#8892A0; font-size:11px;">{detail_str}</span>'
+                        f'</div>'
+                    )
+                for k in g.get("failed_keys", []):
+                    detail = criteria.get(k, {}).get("detail", {})
+                    err = detail.get("error", "")
+                    err_str = f' ({err})' if err else ""
+                    checks_html += (
+                        f'<div style="margin:2px 0 2px 24px; font-size:12px;">'
+                        f'<span style="color:#FF4757;">✗</span> '
+                        f'<span style="color:#8892A0;">{k.replace("_"," ").title()}</span>'
+                        f'<span style="color:#FF475780; font-size:11px;">{err_str}</span>'
+                        f'</div>'
+                    )
+                for k in g.get("deferred_keys", []):
+                    checks_html += (
+                        f'<div style="margin:2px 0 2px 24px; font-size:12px; opacity:0.5; font-style:italic;">'
+                        f'<span style="color:#8892A0;">○</span> '
+                        f'<span>{k.replace("_"," ").title()}</span>'
+                        f' <span style="font-size:10px;">DEFERRED</span>'
+                        f'</div>'
+                    )
+
+                st.markdown(
+                    f'<div style="background:rgba(255,255,255,0.03); border:1px solid {gcolor}20; '
+                    f'border-radius:8px; padding:10px 12px; margin:6px 0;">'
+                    f'<div style="display:flex; justify-content:space-between; align-items:center;">'
+                    f'<span style="color:{status_color}; font-weight:700; font-size:15px;">{status_icon}</span> '
+                    f'<span style="color:{gcolor}; font-weight:600; font-size:13px; flex:1; margin-left:8px;">{g["name"]}</span>'
+                    f'<span style="font-size:10px; padding:2px 8px; border-radius:8px; background:{gcolor}20; color:{gcolor};">'
+                    f'{glabel} · {g["passed_count"]}/{g["active_count"]} (need {g["min_pass"]})</span>'
+                    f'</div>'
+                    f'{checks_html}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.divider()
+
+        # Raw criteria table
+        with st.expander("All Criteria Raw Results", expanded=False):
+            import pandas as _pd
+            rows = []
+            for k, v in sorted(criteria.items()):
+                rows.append({
+                    "Criterion": k,
+                    "Passed": "✓" if v["passed"] else "✗",
+                    "Details": str({dk: dv for dk, dv in v.get("detail", {}).items()
+                                   if dk not in ("ticker", "sector", "passed")})[:120],
+                })
+            st.dataframe(_pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    else:
+        st.markdown("Enter a ticker in the sidebar and click **Run Diagnostic** to test all screening criteria.")
+
+    st.stop()
+
 # ── Stock Deep Dive Mode ─────────────────────────────────────
 if analysis_mode == "Stock Deep Dive":
     if run_deep_dive and ticker:
@@ -1180,26 +1609,26 @@ if analysis_mode == "Stock Deep Dive":
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1:
             price = info.get("regularMarketPrice", "N/A")
-            st.metric("Price", f"INR {price}")
+            render_metric_card("Price", f"INR {price}", accent="#00D4AA")
         with c2:
             mcap = info.get("marketCap")
             if mcap:
                 mcap_display = f"{mcap/1e7:.0f} Cr" if mcap >= 1e7 else f"{mcap:,.0f}"
             else:
                 mcap_display = "N/A"
-            st.metric("Market Cap", mcap_display)
+            render_metric_card("Market Cap", mcap_display, accent="#4DA6FF")
         with c3:
             inv_score = research.get("investment_score", {})
             comp_score = inv_score.get("composite_score", "N/A")
             rec = inv_score.get("recommendation", "")
-            st.metric("Investment Score", f"{comp_score}/100", delta=rec)
+            render_metric_card("Investment Score", f"{comp_score}/100", delta=rec, delta_up=True, accent="#00D4AA")
         with c4:
             geo = profile.get("geopolitical", {})
-            st.metric("Geo Risk", geo.get("risk_level", "N/A"), delta=f"{geo.get('overall_score', 'N/A')}/100")
+            render_metric_card("Geo Risk", geo.get("risk_level", "N/A"), delta=f"{geo.get('overall_score', 'N/A')}/100", accent="#FFA726")
         with c5:
             lag = profile.get("smart_money_lag", 0)
             lag_label = "Opportunity" if lag > 20 else "Neutral" if lag > -10 else "Crowded"
-            st.metric("Smart Money Lag", f"{lag}", delta=lag_label)
+            render_metric_card("Smart Money Lag", f"{lag}", delta=lag_label, delta_up=lag > 0, accent="#B388FF")
 
         # ── USP Analysis Expander ─────────────────────────────
         with st.expander("USP Analysis Details", expanded=False):
@@ -1295,239 +1724,320 @@ if analysis_mode == "Stock Deep Dive":
 
     st.stop()
 
-# ── Stock Screener Mode (New 4-Tab Layout) ───────────────────
-if analysis_mode == "Stock Screener":
-    if run_screener:
-        progress_bar = st.progress(0, text="Starting 3-category screener...")
+# ── Screener Runner (shared by Momentum & Value pages) ────────
 
-        def _cat_progress(fraction: float, message: str):
-            progress_bar.progress(min(fraction, 1.0), text=message)
+def _run_screener_for_category(category_key: str, run_debate_flag: bool):
+    """Run the screener for a single or both categories and store results."""
+    # Check if "Run Both" was requested
+    run_both = st.session_state.pop("_run_both", False)
+    categories = ["Momentum", "ValueBottom"] if run_both else [category_key]
+    label = "Momentum + Value" if run_both else category_key
+    progress_bar = st.progress(0, text=f"Starting {label} screener...")
 
+    def _cat_progress(fraction: float, message: str):
+        progress_bar.progress(min(fraction, 1.0), text=message)
+
+    try:
+        import time as _time
+        _t_start = _time.time()
+        _timings: dict[str, float] = {}
+
+        _cat_progress(0.01, "Detecting market regime...")
         try:
-            # Run regime detection first
-            _cat_progress(0.01, "Detecting market regime...")
-            try:
-                from app.agents.regime_agent import detect_regime
-                regime_data = detect_regime(use_llm=False)
-            except Exception as e:
-                regime_data = {"regime": "mixed", "reasoning": f"Detection failed: {e}", "weights": {"A": 1.0, "B": 1.0, "C": 1.0}}
-
-            from app.tools.screener.category_screener import run_category_screener
-            result = run_category_screener(
-                categories=selected_cats,
-                progress_cb=_cat_progress,
-                max_stocks=50 if test_mode else None,
-            )
-            result["regime_data"] = regime_data
-            st.session_state.category_screener_data = result
-
-            # Run debate if requested
-            if run_debate and result.get("category_results"):
-                progress_bar.progress(0.85, text="Running AI debate for top stocks...")
-                try:
-                    from app.agents.debate_agents import run_debate as _run_debate, _select_top_stocks
-                    from app.ui.usp_cards import transform_usp_data
-
-                    usp_cards = transform_usp_data(result.get("usp_scores", {}))
-                    cat_results = result.get("category_results", {})
-                    # Convert dict {cat: [stocks]} to list [{category, stocks}]
-                    if isinstance(cat_results, dict):
-                        cat_list = [{"category": k, "stocks": v} for k, v in cat_results.items()]
-                    else:
-                        cat_list = cat_results
-
-                    top_tickers = _select_top_stocks(usp_cards, cat_list, max_stocks=5)
-                    debate_results = []
-                    for t in top_tickers:
-                        dr = _run_debate(ticker=t, usp_cards=usp_cards, category_results=cat_list)
-                        debate_results.append(dr)
-                    result["debate_results"] = debate_results
-                    result["usp_cards"] = usp_cards
-                    st.session_state.category_screener_data = result
-                except Exception as e:
-                    st.warning(f"Debate phase failed (non-fatal): {e}")
-
-            progress_bar.empty()
-            st.success("Category screening complete!")
+            from app.agents.regime_agent import detect_regime
+            regime_data = detect_regime(use_llm=False)
         except Exception as e:
-            progress_bar.empty()
-            st.error(f"Category screener failed: {e}")
-            import traceback
-            st.code(traceback.format_exc())
+            regime_data = {"regime": "mixed", "reasoning": f"Detection failed: {e}", "weights": {"Momentum": 1.0, "ValueBottom": 1.0}}
+        _timings["regime"] = _time.time() - _t_start
 
-    cdata = st.session_state.category_screener_data
-    if cdata:
-        # ── Regime Banner ────────────────────────────────────
-        regime = cdata.get("regime_data", {})
-        if regime:
-            regime_name = regime.get("regime", "mixed").upper()
-            regime_colors = {"BULL": "#2ecc71", "BEAR": "#e74c3c", "ROTATION": "#f39c12", "MIXED": "#95a5a6"}
-            color = regime_colors.get(regime_name, "#95a5a6")
-            vix = regime.get("vix")
-            vix_text = f" | VIX: {vix:.1f}" if vix else ""
-            st.markdown(
-                f'<div style="background:{color}20; border:2px solid {color}; border-radius:10px; padding:12px; margin-bottom:16px;">'
-                f'<span style="font-size:1.3rem; font-weight:700; color:{color};">Market Regime: {regime_name}</span>'
-                f'<span style="margin-left:20px; color:#666;">{regime.get("reasoning", "")}{vix_text}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+        _t_screen = _time.time()
+        from app.tools.screener.category_screener import run_category_screener
 
-        # ── 4 Tabs ───────────────────────────────────────────
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "Screening Results",
-            "USP Analysis",
-            "AI Debate",
-            "Deep Dive",
-        ])
+        # Build enabled_criteria and min_criteria from sidebar selections
+        _enabled: dict[str, set[str]] = {}
+        mom_crit = st.session_state.get("_mom_criteria")
+        val_crit = st.session_state.get("_val_criteria")
+        if mom_crit is not None:
+            _enabled["Momentum"] = mom_crit
+        if val_crit is not None:
+            _enabled["ValueBottom"] = val_crit
 
-        # ── Tab 1: Screening Results ─────────────────────────
-        with tab1:
-            # Summary metrics
-            summary = cdata.get("summary", {})
-            if summary:
-                sc1, sc2, sc3, sc4 = st.columns(4)
-                with sc1:
-                    st.metric("Universe", summary.get("universe_size", "?"))
-                with sc2:
-                    st.metric("After Tech Filter", summary.get("after_tech_filter", "?"))
-                with sc3:
-                    st.metric("With Fundamentals", summary.get("with_fundamentals", "?"))
-                with sc4:
-                    st.metric("Total Survivors", summary.get("total_survivors", "?"))
-                st.divider()
+        result = run_category_screener(
+            categories=categories,
+            progress_cb=_cat_progress,
+            max_stocks=50 if test_mode else None,
+            enabled_criteria=_enabled if _enabled else None,
+        )
+        _timings["screening"] = _time.time() - _t_screen
+        result["regime_data"] = regime_data
+        st.session_state.category_screener_data = result
 
-            cat_results = cdata.get("category_results", {})
-            if isinstance(cat_results, dict):
-                cat_items = cat_results.items()
-            else:
-                cat_items = [(c.get("category", "?"), c) for c in cat_results]
+        # Run debate if requested
+        if run_debate_flag and result.get("category_results"):
+            _t_debate = _time.time()
+            use_deep = st.session_state.get("_debate_deep", False)
+            mode_label = "Deep" if use_deep else "Quick"
+            progress_bar.progress(0.85, text=f"Running {mode_label} AI debate for top stocks...")
+            try:
+                from app.agents.debate_agents import _select_top_stocks, MAX_DEBATE_STOCKS
+                from app.ui.usp_cards import transform_usp_data
 
-            cat_colors = {"A": "#3498db", "B": "#2ecc71", "C": "#e67e22"}
-            cat_labels = {"A": "Strengthening Industries", "B": "Momentum", "C": "Value Bottoms"}
+                usp_cards = transform_usp_data(result.get("usp_scores", {}))
+                cat_results = result.get("category_results", {})
+                if isinstance(cat_results, dict):
+                    cat_list = [{"category": k, "stocks": v} for k, v in cat_results.items()]
+                else:
+                    cat_list = cat_results
 
-            for cat_key, cat_data in cat_items:
-                stocks = cat_data if isinstance(cat_data, list) else cat_data.get("stocks", [])
-                skipped = cat_data.get("skipped", False) if isinstance(cat_data, dict) else False
-                reason = cat_data.get("reason", "") if isinstance(cat_data, dict) else ""
-                color = cat_colors.get(cat_key, "#95a5a6")
-                label = cat_labels.get(cat_key, cat_key)
+                top_tickers = _select_top_stocks(usp_cards, cat_list, max_stocks=MAX_DEBATE_STOCKS)
+                debate_results = []
 
-                with st.expander(
-                    f"Category {cat_key}: {label} — {len(stocks)} stocks"
-                    + (" (SKIPPED)" if skipped else ""),
-                    expanded=not skipped,
-                ):
-                    if skipped:
-                        st.info(f"Category skipped: {reason}")
-                    elif stocks:
-                        rows = []
-                        for s in stocks:
-                            criteria = s.get("criteria_passed", [])
-                            rows.append({
-                                "Ticker": s.get("ticker", ""),
-                                "Sector": s.get("sector", ""),
-                                "Score": s.get("weighted_score", s.get("score", 0)),
-                                "Criteria Met": len(criteria) if isinstance(criteria, list) else criteria,
-                                "Criteria": ", ".join(criteria) if isinstance(criteria, list) else str(criteria),
-                            })
-                        df = pd.DataFrame(rows)
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("No stocks passed this category's criteria.")
+                if use_deep:
+                    from app.agents.debate_agents import run_debate as _run_debate_fn
+                    for t in top_tickers:
+                        dr = _run_debate_fn(ticker=t, usp_cards=usp_cards, category_results=cat_list)
+                        debate_results.append(dr)
+                else:
+                    from app.agents.debate_hybrid import run_hybrid_debate
+                    for t in top_tickers:
+                        dr = run_hybrid_debate(ticker=t, usp_cards=usp_cards, category_results=cat_list)
+                        debate_results.append(dr)
 
-            # Universe info
-            universe = cdata.get("universe_info", {})
-            if universe:
-                st.caption(
-                    f"Universe: {universe.get('ticker_count', '?')} tickers | "
-                    f"Technical filter survivors: {universe.get('technical_survivors', '?')}"
+                result["debate_results"] = debate_results
+                result["usp_cards"] = usp_cards
+                st.session_state.category_screener_data = result
+            except Exception as e:
+                st.warning(f"Debate phase failed (non-fatal): {e}")
+            _timings["debate"] = _time.time() - _t_debate
+
+        _timings["total"] = _time.time() - _t_start
+        result["timings"] = _timings
+
+        progress_bar.empty()
+        # Show timing breakdown
+        parts = []
+        for phase in ["regime", "screening", "debate", "total"]:
+            if phase in _timings:
+                parts.append(f"{phase}: {_timings[phase]:.0f}s")
+        st.success(f"{label} complete! ({' | '.join(parts)})")
+    except Exception as e:
+        progress_bar.empty()
+        st.error(f"Screener failed: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+
+
+def _render_regime_banner(cdata: dict):
+    """Render the market regime banner."""
+    regime = cdata.get("regime_data", {})
+    if regime:
+        regime_name = regime.get("regime", "mixed").upper()
+        regime_colors = {"BULL": "#2ecc71", "BEAR": "#e74c3c", "ROTATION": "#f39c12", "MIXED": "#95a5a6"}
+        color = regime_colors.get(regime_name, "#95a5a6")
+        vix = regime.get("vix")
+        vix_text = f" | VIX: {vix:.1f}" if vix else ""
+        st.markdown(
+            f'<div style="background:{color}20; border:2px solid {color}; border-radius:10px; padding:12px; margin-bottom:16px;">'
+            f'<span style="font-size:1.3rem; font-weight:700; color:{color};">Market Regime: {regime_name}</span>'
+            f'<span style="margin-left:20px; color:#666;">{regime.get("reasoning", "")}{vix_text}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+
+def _render_screener_results(cdata: dict, category_key: str, criteria_groups: list, accent_color: str):
+    """Render screener results with criteria panel and stock table."""
+    _render_regime_banner(cdata)
+
+    # Summary metrics
+    summary = cdata.get("summary", {})
+    if summary:
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+            render_metric_card("Universe", summary.get("universe_size", "?"), accent="#4DA6FF")
+        with sc2:
+            render_metric_card("After Tech Filter", summary.get("after_tech_filter", "?"), accent="#FFA726")
+        with sc3:
+            render_metric_card("With Fundamentals", summary.get("with_fundamentals", "?"), accent="#B388FF")
+        with sc4:
+            render_metric_card("Total Survivors", summary.get("total_survivors", "?"), accent="#00D4AA")
+        st.divider()
+
+    # 3 Tabs: Results | USP | Debate
+    tab1, tab2, tab3 = st.tabs(["Screener Results", "USP Analysis", "AI Debate"])
+
+    with tab1:
+        # Criteria panel
+        with st.expander("Active Screening Criteria", expanded=False):
+            render_criteria_panel(criteria_groups, accent_color)
+
+        st.divider()
+
+        # Stock results table
+        cat_results = cdata.get("category_results", {})
+        stocks = []
+        if isinstance(cat_results, dict):
+            stocks = cat_results.get(category_key, [])
+            if isinstance(stocks, dict):
+                stocks = stocks.get("stocks", [])
+        elif isinstance(cat_results, list):
+            for cr in cat_results:
+                if cr.get("category") == category_key:
+                    stocks = cr.get("stocks", [])
+                    break
+
+        if stocks:
+            # Group stocks by tier
+            tier_buckets: dict[str, list] = {t: [] for t in TIER_ORDER}
+            for s in stocks:
+                tier = s.get("tier", "failed")
+                tier_buckets.setdefault(tier, []).append(s)
+
+            # Tier summary cards
+            tc1, tc2, tc3, tc4 = st.columns(4)
+            with tc1:
+                render_metric_card("★ Buy Zone", len(tier_buckets.get("buy_zone", [])),
+                                   accent=TIER_CONFIG["buy_zone"]["color"])
+            with tc2:
+                render_metric_card("◉ Watchlist", len(tier_buckets.get("watchlist", [])),
+                                   accent=TIER_CONFIG["watchlist"]["color"])
+            with tc3:
+                render_metric_card("◎ Monitor", len(tier_buckets.get("monitor", [])),
+                                   accent=TIER_CONFIG["monitor"]["color"])
+            with tc4:
+                render_metric_card("⊘ Near Miss", len(tier_buckets.get("near_miss", [])),
+                                   accent=TIER_CONFIG["near_miss"]["color"])
+
+            st.divider()
+
+            # Render each non-empty tier
+            for tier_key in TIER_ORDER:
+                tier_stocks = tier_buckets.get(tier_key, [])
+                if not tier_stocks:
+                    continue
+
+                tc = TIER_CONFIG[tier_key]
+                is_failed = tier_key == "failed"
+                expanded = not is_failed
+
+                # Tier header
+                st.markdown(
+                    f'<div style="background:rgba(26,31,46,0.8); backdrop-filter:blur(10px); '
+                    f'border-left:4px solid {tc["color"]}; border-radius:10px; '
+                    f'padding:12px 20px; margin:16px 0 8px 0; '
+                    f'display:flex; align-items:center; gap:10px;">'
+                    f'<span style="font-size:1.3rem;">{tc["icon"]}</span>'
+                    f'<span style="font-size:1rem; font-weight:700; color:{tc["color"]};">{tc["label"]}</span>'
+                    f'<span style="color:#8892A0; font-size:0.85rem;">— {len(tier_stocks)} stocks</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
                 )
 
-            # Export & Share buttons
-            st.divider()
-            st.markdown("#### Export & Share")
-            ex1, ex2, ex3, ex4 = st.columns(4)
-            with ex1:
-                json_data = json.dumps(cdata, indent=2, default=str)
-                st.download_button("Download JSON", data=json_data,
-                                   file_name=f"screener_{datetime.now():%Y%m%d}.json",
-                                   mime="application/json", key="tab1_json")
-            with ex2:
-                try:
-                    from app.sharing import generate_screener_pdf
-                    pdf_bytes = generate_screener_pdf(cdata)
-                    st.download_button("Download PDF", data=pdf_bytes,
-                                       file_name=f"screener_{datetime.now():%Y%m%d}.pdf",
-                                       mime="application/pdf", key="tab1_pdf")
-                except Exception as e:
-                    st.error(f"PDF failed: {e}")
-            with ex3:
-                from app.sharing import is_email_configured
-                if is_email_configured():
-                    with st.popover("Email Report", use_container_width=True):
-                        recip = st.text_input("Recipient", key="screener_email_to")
-                        if st.button("Send", key="screener_email_send"):
-                            if recip:
-                                from app.sharing import generate_screener_pdf, send_email_with_pdf
-                                pdf = generate_screener_pdf(cdata)
-                                ok, msg = send_email_with_pdf(
-                                    recip,
-                                    f"Stock Screener Report - {regime_name} Regime",
-                                    f"AI-generated screener report.\nRegime: {regime_name}\n"
-                                    f"Generated: {datetime.now().strftime('%d %b %Y')}",
-                                    pdf, f"screener_{datetime.now():%Y%m%d}.pdf",
-                                )
-                                st.success(msg) if ok else st.error(msg)
-                else:
-                    st.button("Email (set SMTP)", disabled=True, key="screener_email_dis")
-            with ex4:
-                from app.sharing import is_whatsapp_configured, send_whatsapp_screener
-                all_tickers = []
-                for v in (cat_results.values() if isinstance(cat_results, dict) else cat_results):
-                    stocks = v if isinstance(v, list) else v.get("stocks", [])
-                    all_tickers.extend(s.get("ticker", "") for s in stocks[:3])
-                if is_whatsapp_configured():
-                    with st.popover("WhatsApp", use_container_width=True):
-                        scr_phone = st.text_input(
-                            "Phone (e.g. 919876543210)",
-                            value=os.getenv("WHATSAPP_DEFAULT_PHONE", ""),
-                            key="scr_wa_phone",
-                        )
-                        if st.button("Send on WhatsApp", key="scr_wa_send"):
-                            if scr_phone:
-                                ok, msg = send_whatsapp_screener(
-                                    scr_phone,
-                                    total_stocks=summary.get("total_survivors", 0),
-                                    regime=regime_name,
-                                    top_picks=all_tickers[:5],
-                                )
-                                st.success(msg) if ok else st.error(msg)
-                            else:
-                                st.warning("Enter a phone number.")
-                else:
-                    st.button("WhatsApp (set Twilio)", disabled=True, key="scr_wa_dis")
+                if is_failed:
+                    # Failed: collapsed compact table
+                    with st.expander(f"Show {len(tier_stocks)} failed stocks", expanded=False):
+                        fail_rows = []
+                        for s in tier_stocks[:50]:
+                            gr = s.get("gate_results", [])
+                            failed_gates = [g["name"] for g in gr if not g["passed"]]
+                            fail_rows.append({
+                                "Ticker": s.get("ticker", ""),
+                                "Sector": s.get("sector", ""),
+                                "Score": f"{s.get('score', 0)}/{s.get('active_total', '?')}",
+                                "Failed Gates": ", ".join(failed_gates),
+                            })
+                        st.dataframe(pd.DataFrame(fail_rows), use_container_width=True, hide_index=True)
+                    continue
 
-        # ── Tab 2: USP Analysis ──────────────────────────────
-        with tab2:
+                # Summary table for this tier
+                rows = []
+                for s in tier_stocks:
+                    gate_cols = {}
+                    for g in s.get("gate_results", []):
+                        gate_cols[g["name"]] = "✓" if g["passed"] else "✗"
+                    row = {
+                        "Ticker": s.get("ticker", ""),
+                        "Sector": s.get("sector", ""),
+                        "Score": f"{s.get('score', 0)}/{s.get('active_total', '?')}",
+                        **gate_cols,
+                    }
+                    rows.append(row)
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+                # Per-stock expanders
+                for s in tier_stocks[:30]:
+                    score = s.get("score", 0)
+                    active_total = s.get("active_total", "?")
+                    gate_results = s.get("gate_results", [])
+                    tier_badge = f'{tc["icon"]} {tc["label"]}'
+
+                    with st.expander(f"{s['ticker']} — {score}/{active_total} | {s.get('sector', '')}"):
+                        # Near miss reason
+                        if tier_key == "near_miss" and s.get("near_miss_reason"):
+                            st.markdown(
+                                f'<div style="background:#FFA72615; border:1px solid #FFA72640; '
+                                f'border-radius:8px; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#FFA726;">'
+                                f'{s["near_miss_reason"]}</div>',
+                                unsafe_allow_html=True,
+                            )
+
+                        # Gate-by-gate breakdown
+                        for g in gate_results:
+                            gcolor = _GATE_TYPE_COLORS.get(g["gate_type"], "#8892A0")
+                            status_icon = "✓" if g["passed"] else "✗"
+                            status_color = "#00D4AA" if g["passed"] else "#FF4757"
+                            passed_keys = g.get("passed_keys", [])
+                            failed_keys = g.get("failed_keys", [])
+                            checks = " ".join(
+                                f'<span style="color:#00D4AA;">✓{k.replace("_"," ").title()}</span>' for k in passed_keys
+                            ) + " " + " ".join(
+                                f'<span style="color:#FF4757;">✗{k.replace("_"," ").title()}</span>' for k in failed_keys
+                            )
+                            st.markdown(
+                                f'<div style="margin:4px 0; font-size:13px;">'
+                                f'<span style="color:{status_color}; font-weight:700;">{status_icon}</span> '
+                                f'<span style="color:{gcolor}; font-weight:600;">{g["name"]}</span> '
+                                f'<span style="color:#8892A0;">({g["passed_count"]}/{g["active_count"]})</span> '
+                                f'{checks}</div>',
+                                unsafe_allow_html=True,
+                            )
+        else:
+            st.info("No stocks found. Try running the screener.")
+
+        # Export buttons
+        st.divider()
+        ex1, ex2 = st.columns(2)
+        with ex1:
+            json_data = json.dumps(cdata, indent=2, default=str)
+            st.download_button("Download JSON", data=json_data,
+                               file_name=f"{category_key}_{datetime.now():%Y%m%d}.json",
+                               mime="application/json", key=f"{category_key}_json")
+        with ex2:
+            try:
+                from app.sharing import generate_screener_pdf
+                pdf_bytes = generate_screener_pdf(cdata)
+                st.download_button("Download PDF", data=pdf_bytes,
+                                   file_name=f"{category_key}_{datetime.now():%Y%m%d}.pdf",
+                                   mime="application/pdf", key=f"{category_key}_pdf")
+            except Exception as e:
+                st.button("PDF unavailable", disabled=True, key=f"{category_key}_pdf_dis")
+
+    # Tab 2: USP Analysis
+    with tab2:
+        try:
             from app.ui.usp_cards import (
-                render_usp_heatmap,
-                render_usp_card,
-                render_usp_radar,
-                render_contradiction_alerts,
+                render_usp_heatmap, render_usp_card, render_usp_radar,
+                render_contradiction_alerts, transform_usp_data,
             )
 
             usp_cards = cdata.get("usp_cards", {})
             if not usp_cards and cdata.get("usp_scores"):
-                from app.ui.usp_cards import transform_usp_data
                 usp_cards = transform_usp_data(cdata["usp_scores"])
 
             if usp_cards:
-                # Layer 1: Heatmap
                 st.markdown("### USP Heatmap")
                 render_usp_heatmap(usp_cards)
 
-                # Layer 2: Contradiction Alerts
                 cat_results_list = cdata.get("category_results", [])
                 if isinstance(cat_results_list, dict):
                     cat_results_list = [{"category": k, "stocks": v} if isinstance(v, list) else v
@@ -1537,145 +2047,158 @@ if analysis_mode == "Stock Screener":
                     usp_cards,
                 )
 
-                # Layer 3: Expandable USP Cards
                 st.markdown("### Per-Stock USP Analysis")
-                for ticker in sorted(usp_cards.keys(),
-                                    key=lambda t: usp_cards[t].get("_composite", 0),
-                                    reverse=True):
-                    col1, col2 = st.columns([2, 1])
-                    with col1:
-                        render_usp_card(ticker, usp_cards[ticker])
-                    with col2:
-                        render_usp_radar(ticker, usp_cards[ticker])
+                for tkr in sorted(usp_cards.keys(),
+                                  key=lambda t: usp_cards[t].get("_composite", 0),
+                                  reverse=True):
+                    c1, c2 = st.columns([2, 1])
+                    with c1:
+                        render_usp_card(tkr, usp_cards[tkr])
+                    with c2:
+                        render_usp_radar(tkr, usp_cards[tkr])
             else:
                 st.info("No USP data available. Run the screener first.")
+        except Exception as e:
+            st.error(f"USP rendering failed: {e}")
 
-        # ── Tab 3: AI Debate ─────────────────────────────────
-        with tab3:
-            debate_results = cdata.get("debate_results", [])
-            if debate_results:
-                st.markdown("### Bull vs Bear Debate")
-                for debate in debate_results:
-                    ticker = debate.get("ticker", "?")
-                    verdict = debate.get("verdict", {})
-                    conviction = verdict.get("conviction_score", 5)
-                    rec = verdict.get("recommendation", "HOLD")
+    # Tab 3: AI Debate
+    with tab3:
+        debate_results = cdata.get("debate_results", [])
+        if debate_results:
+            st.markdown("### Bull vs Bear Debate")
+            for debate in debate_results:
+                tkr = debate.get("ticker", "?")
+                verdict = debate.get("verdict", {})
+                conviction = verdict.get("conviction_score", 5)
+                rec = verdict.get("recommendation", "HOLD")
 
-                    # Conviction color
-                    if conviction >= 7:
-                        conv_color = "#2ecc71"
-                    elif conviction >= 5:
-                        conv_color = "#f39c12"
-                    else:
-                        conv_color = "#e74c3c"
+                conv_color = "#00D4AA" if conviction >= 7 else "#FFA726" if conviction >= 5 else "#FF4757"
+                pct = conviction * 10
+                # SVG conviction gauge
+                dash = 2 * 3.14159 * 40  # circumference
+                fill = dash * pct / 100
 
-                    with st.expander(
-                        f"{ticker} — {rec} (Conviction: {conviction}/10)",
-                        expanded=True,
-                    ):
-                        # Verdict banner
+                with st.expander(f"{tkr} — {rec} (Conviction: {conviction}/10)", expanded=True):
+                    gc1, gc2 = st.columns([1, 3])
+                    with gc1:
                         st.markdown(
-                            f'<div style="background:{conv_color}20; border:2px solid {conv_color}; '
-                            f'border-radius:8px; padding:12px; margin-bottom:12px;">'
-                            f'<span style="font-size:1.2rem; font-weight:700; color:{conv_color};">'
-                            f'{rec} — Conviction {conviction}/10</span><br>'
-                            f'<span style="color:#666;">{verdict.get("reasoning", "")}</span>'
+                            f'<div style="text-align:center;">'
+                            f'<svg width="100" height="100" viewBox="0 0 100 100">'
+                            f'<circle cx="50" cy="50" r="40" fill="none" stroke="#1E2A3A" stroke-width="8"/>'
+                            f'<circle cx="50" cy="50" r="40" fill="none" stroke="{conv_color}" stroke-width="8" '
+                            f'stroke-dasharray="{fill:.1f} {dash:.1f}" stroke-linecap="round" '
+                            f'transform="rotate(-90 50 50)"/>'
+                            f'<text x="50" y="46" text-anchor="middle" fill="{conv_color}" '
+                            f'font-size="20" font-weight="800">{conviction}</text>'
+                            f'<text x="50" y="62" text-anchor="middle" fill="#8892A0" font-size="9">/10</text>'
+                            f'</svg>'
+                            f'<div style="color:{conv_color}; font-weight:700; font-size:0.9rem;">{rec}</div>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+                    with gc2:
+                        st.markdown(
+                            f'<div class="debate-card" style="border-left:3px solid {conv_color};">'
+                            f'<div style="color:#E8ECF1; font-size:0.95rem;">{verdict.get("reasoning", "")}</div>'
                             f'</div>',
                             unsafe_allow_html=True,
                         )
 
-                        # Key factors
-                        factors = verdict.get("key_factors", [])
-                        if factors:
-                            st.markdown("**Key Factors:** " + " | ".join(factors))
+                    factors = verdict.get("key_factors", [])
+                    if factors:
+                        tags = "".join(
+                            f'<span class="signal-tag" style="background:rgba(0,212,170,0.1); '
+                            f'color:#00D4AA; border:1px solid rgba(0,212,170,0.3);">{f}</span>'
+                            for f in factors
+                        )
+                        st.markdown(f'<div style="margin:8px 0;">{tags}</div>', unsafe_allow_html=True)
 
-                        # Side-by-side Bull vs Bear
-                        col_bull, col_bear = st.columns(2)
-                        with col_bull:
-                            st.markdown("#### Bull Case")
-                            for i, arg in enumerate(debate.get("bull_arguments", []), 1):
-                                st.markdown(f"**Round {i}:**")
-                                st.markdown(arg)
-                        with col_bear:
-                            st.markdown("#### Bear Case")
-                            for i, arg in enumerate(debate.get("bear_arguments", []), 1):
-                                st.markdown(f"**Round {i}:**")
-                                st.markdown(arg)
+                    col_bull, col_bear = st.columns(2)
+                    with col_bull:
+                        st.markdown(
+                            '<div class="debate-card" style="border-left:3px solid #00D4AA;">'
+                            '<div style="color:#00D4AA; font-weight:700; margin-bottom:8px;">BULL CASE</div>',
+                            unsafe_allow_html=True,
+                        )
+                        for i, arg in enumerate(debate.get("bull_arguments", []), 1):
+                            st.markdown(f"**Round {i}:** {arg}")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    with col_bear:
+                        st.markdown(
+                            '<div class="debate-card" style="border-left:3px solid #FF4757;">'
+                            '<div style="color:#FF4757; font-weight:700; margin-bottom:8px;">BEAR CASE</div>',
+                            unsafe_allow_html=True,
+                        )
+                        for i, arg in enumerate(debate.get("bear_arguments", []), 1):
+                            st.markdown(f"**Round {i}:** {arg}")
+                        st.markdown('</div>', unsafe_allow_html=True)
 
-                        # Strength meters
-                        bull_str = verdict.get("bull_strength", 5)
-                        bear_str = verdict.get("bear_strength", 5)
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            st.progress(bull_str / 10, text=f"Bull strength: {bull_str}/10")
-                        with c2:
-                            st.progress(bear_str / 10, text=f"Bear strength: {bear_str}/10")
-            else:
-                st.info("No debate results. Enable 'Run AI Debate' in the sidebar and run the screener.")
+                    bull_str = verdict.get("bull_strength", 5)
+                    bear_str = verdict.get("bear_strength", 5)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.markdown(
+                            f'<div style="margin:4px 0;"><span style="color:#00D4AA; font-size:12px; font-weight:600;">BULL STRENGTH {bull_str}/10</span>'
+                            f'<div style="background:#1A1F2E; border-radius:4px; height:8px; margin-top:4px;">'
+                            f'<div style="background:#00D4AA; width:{bull_str*10}%; height:100%; border-radius:4px;"></div>'
+                            f'</div></div>',
+                            unsafe_allow_html=True,
+                        )
+                    with c2:
+                        st.markdown(
+                            f'<div style="margin:4px 0;"><span style="color:#FF4757; font-size:12px; font-weight:600;">BEAR STRENGTH {bear_str}/10</span>'
+                            f'<div style="background:#1A1F2E; border-radius:4px; height:8px; margin-top:4px;">'
+                            f'<div style="background:#FF4757; width:{bear_str*10}%; height:100%; border-radius:4px;"></div>'
+                            f'</div></div>',
+                            unsafe_allow_html=True,
+                        )
+        else:
+            st.info("No debate results. Enable 'Run AI Debate' in the sidebar and run the screener.")
 
-        # ── Tab 4: Deep Dive ─────────────────────────────────
-        with tab4:
-            st.markdown("### Quick Deep Dive")
-            st.markdown("Select a stock from the screening results to run a full deep dive.")
 
-            # Collect all recommended tickers
-            all_screened = []
-            cat_results = cdata.get("category_results", {})
-            if isinstance(cat_results, dict):
-                for cat_data in cat_results.values():
-                    stocks = cat_data if isinstance(cat_data, list) else cat_data.get("stocks", [])
-                    for s in stocks:
-                        t = s.get("ticker", "")
-                        if t and t not in all_screened:
-                            all_screened.append(t)
-            elif isinstance(cat_results, list):
-                for cat_data in cat_results:
-                    for s in cat_data.get("stocks", []):
-                        t = s.get("ticker", "")
-                        if t and t not in all_screened:
-                            all_screened.append(t)
+# ── Momentum Screener Page ────────────────────────────────────
+if analysis_mode == "Momentum Screener":
+    st.markdown(
+        '<div class="section-hero" style="border-left:4px solid #00D4AA;">'
+        '<h3>Momentum Screener</h3>'
+        '<p>5 gates · 17 criteria · Strong stocks in strong sectors · RSI 55-75 · Volume confirmed</p>'
+        '</div>', unsafe_allow_html=True,
+    )
 
-            if all_screened:
-                selected_ticker = st.selectbox("Select stock for deep dive", all_screened)
-                if st.button("Run Deep Dive", type="primary"):
-                    with st.spinner(f"Running deep dive for {selected_ticker}..."):
-                        try:
-                            from app.graph import run_research
-                            result = run_research(selected_ticker)
-                            st.session_state.research_state = result
-                            st.session_state.last_ticker = selected_ticker
-                            st.success(f"Deep dive complete for {selected_ticker}!")
+    if run_momentum:
+        _run_screener_for_category("Momentum", run_debate)
 
-                            # Render report if available
-                            report = result.get("final_report", "")
-                            if report:
-                                st.markdown(report)
-                                score_data = result.get("investment_score", {})
-                                _render_sharing_buttons(report, selected_ticker, score_data, key_suffix="dd")
-                        except Exception as e:
-                            st.error(f"Deep dive failed: {e}")
-            else:
-                st.info("Run the screener first to see stocks for deep dive.")
-
+    cdata = st.session_state.category_screener_data
+    if cdata and "Momentum" in (cdata.get("category_results") or {}):
+        _render_screener_results(cdata, "Momentum", MOM_GATE_DISPLAY, "#00D4AA")
     else:
-        # Landing page
-        st.markdown("### 3-Category AI Stock Screener")
-        st.markdown("""
-        Click **Run Category Screener** in the sidebar to analyze Nifty 500 stocks across:
+        st.markdown("Click **Run Momentum Screener** in the sidebar to begin.")
+        st.divider()
+        st.markdown("#### Active Screening Criteria (5 Gates, 17 Criteria)")
+        render_criteria_panel(MOM_GATE_DISPLAY, "#00D4AA")
 
-        **Category A: Strengthening Industries** — Top-down sector play with policy/geo tailwinds
+    st.stop()
 
-        **Category B: Momentum** — Price + fundamental inflection (RSI, MA alignment, QoQ growth)
+# ── Value Screener Page ───────────────────────────────────────
+if analysis_mode == "Value Screener":
+    st.markdown(
+        '<div class="section-hero" style="border-left:4px solid #4DA6FF;">'
+        '<h3>Value Bottom Screener</h3>'
+        '<p>Turnaround candidates at valuation floors · 28 criteria · RSI &lt;40 · F-Score ≥ 5</p>'
+        '</div>', unsafe_allow_html=True,
+    )
 
-        **Category C: Value Bottoms** — Contrarian turnaround candidates (low ROE, cheap P/B, capex catalysts)
+    if run_value:
+        _run_screener_for_category("ValueBottom", run_debate)
 
-        **After screening:**
-        - USP Analysis (5 dimensions: Geopolitical, Smart Money, Regulatory, Management, Promoter)
-        - AI Debate (Bull vs Bear with RAG evidence for top 5 stocks)
-        - Deep Dive (full research report for any selected stock)
-
-        First run takes 2-4 minutes. Subsequent runs use cached data.
-        """)
+    cdata = st.session_state.category_screener_data
+    if cdata and "ValueBottom" in (cdata.get("category_results") or {}):
+        _render_screener_results(cdata, "ValueBottom", VAL_GATE_DISPLAY, "#4DA6FF")
+    else:
+        st.markdown("Click **Run Value Screener** in the sidebar to begin.")
+        st.divider()
+        st.markdown("#### Active Screening Criteria (7 Gates, 33 Criteria)")
+        render_criteria_panel(VAL_GATE_DISPLAY, "#4DA6FF")
 
     st.stop()
 

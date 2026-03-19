@@ -178,3 +178,55 @@ def screen_geopolitical_risk(
 
     logger.info("Geopolitical screen: %d stocks with low risk", len(results))
     return results
+
+
+# ── Supply-chain / export screens (keyword-based) ────────────
+
+_SUPPLY_CHAIN_KEYWORDS = [
+    "china plus one", "china+1", "import substitution", "manufacturing hub",
+    "backward integration", "domestic manufacturing", "make in india",
+]
+
+_EXPORT_PLI_KEYWORDS = [
+    "pli", "production linked", "export oriented", "global supply",
+    "export incentive", "foreign revenue", "international market",
+]
+
+
+def _keyword_screen(
+    bulk_info: dict[str, dict],
+    sector_map: dict[str, str],
+    keywords: list[str],
+    label: str,
+) -> list[dict[str, Any]]:
+    """Screen stocks whose business summary matches any keyword."""
+    results: list[dict] = []
+    for ticker, info in bulk_info.items():
+        summary = info.get("longBusinessSummary", "") or ""
+        summary_lower = summary.lower()
+        matched = [kw for kw in keywords if kw in summary_lower]
+        if matched:
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "matched_keywords": matched,
+                "passed": True,
+            })
+    logger.info("%s screen: %d stocks matched", label, len(results))
+    return results
+
+
+def screen_supply_chain_advantage(
+    bulk_info: dict[str, dict],
+    sector_map: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Screen for stocks with supply-chain / China+1 advantage."""
+    return _keyword_screen(bulk_info, sector_map, _SUPPLY_CHAIN_KEYWORDS, "Supply chain")
+
+
+def screen_export_pli_beneficiary(
+    bulk_info: dict[str, dict],
+    sector_map: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Screen for stocks that are PLI / export beneficiaries."""
+    return _keyword_screen(bulk_info, sector_map, _EXPORT_PLI_KEYWORDS, "Export/PLI")

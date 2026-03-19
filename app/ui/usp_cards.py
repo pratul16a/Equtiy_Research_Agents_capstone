@@ -17,15 +17,15 @@ import streamlit as st
 
 
 def _score_color(score: float) -> str:
-    """Map a 0-100 score to a color hex."""
+    """Map a 0-100 score to a color hex (dark theme palette)."""
     if score >= 70:
-        return "#2ecc71"  # green
+        return "#00D4AA"  # accent green
     elif score >= 50:
-        return "#f39c12"  # orange/yellow
+        return "#FFA726"  # accent amber
     elif score >= 30:
-        return "#e67e22"  # dark orange
+        return "#FF8C42"  # warm orange
     else:
-        return "#e74c3c"  # red
+        return "#FF4757"  # accent red
 
 
 def _score_emoji(score: float) -> str:
@@ -347,8 +347,8 @@ def render_usp_radar(ticker: str, usp_data: dict[str, Any], category_avg: dict[s
         r=values,
         theta=labels_closed,
         fill="toself",
-        fillcolor="rgba(46, 204, 113, 0.15)",
-        line=dict(color="#2ecc71", width=2),
+        fillcolor="rgba(0, 212, 170, 0.15)",
+        line=dict(color="#00D4AA", width=2),
         name=ticker,
     ))
 
@@ -360,15 +360,24 @@ def render_usp_radar(ticker: str, usp_data: dict[str, Any], category_avg: dict[s
             r=avg_values,
             theta=labels_closed,
             fill="none",
-            line=dict(color="#95a5a6", width=1, dash="dot"),
+            line=dict(color="#8892A0", width=1, dash="dot"),
             name="Category Avg",
         ))
 
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#0E1117",
+        polar=dict(
+            bgcolor="#0E1117",
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor="#2D3748", color="#8892A0"),
+            angularaxis=dict(gridcolor="#2D3748", color="#E0E0E0"),
+        ),
+        font=dict(color="#E0E0E0"),
         showlegend=True,
         height=350,
         margin=dict(l=40, r=40, t=30, b=30),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#8892A0")),
     )
 
     st.plotly_chart(fig, use_container_width=True)

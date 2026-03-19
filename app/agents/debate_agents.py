@@ -1,18 +1,20 @@
 """Bull vs Bear Debate Agents — 3 agents with multi-round argumentation.
 
 Architecture:
-    Bull Agent (GPT-4o) → argues upside with RAG evidence
-    Bear Agent (GPT-4o) → argues downside with RAG evidence
-    Judge Agent (GPT-4o) → assigns conviction score (1-10) with reasoning
+    Bull Agent → argues upside with RAG evidence
+    Bear Agent → argues downside with RAG evidence
+    Judge Agent → assigns conviction score (1-10) with reasoning
 
-Uses LangGraph cycles for 2-3 debate rounds per stock.
-Only debates top 5 stocks by composite USP + screening score.
+Bull & Bear run in PARALLEL per round for speed.
+Uses a fast model (gemini-2.0-flash via OpenRouter) for debate.
+Only debates top 3 stocks by composite USP + screening score.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from app.config import get_llm
@@ -20,8 +22,10 @@ from app.rag.retriever import search_by_symbol
 
 logger = logging.getLogger(__name__)
 
-MAX_DEBATE_STOCKS = 5
+MAX_DEBATE_STOCKS = 3
 DEBATE_ROUNDS = 2
+# Use GPT-4o for debate quality via OpenRouter
+DEBATE_MODEL = "openai/gpt-4o"
 
 
 def _get_rag_context(symbol: str, query: str, k: int = 5) -> str:
@@ -69,20 +73,9 @@ def run_bull_agent(
     bear_arguments: str | None = None,
     round_num: int = 1,
 ) -> str:
-    """Bull Agent: argue the upside case with RAG evidence.
-
-    Args:
-        ticker: Stock ticker (e.g., "RELIANCE.NS")
-        stock_context: Pre-built context from screening + USP
-        bear_arguments: Previous round's bear arguments to rebut
-        round_num: Current debate round
-
-    Returns:
-        Bull agent's argument text.
-    """
+    """Bull Agent: argue the upside case with RAG evidence."""
     symbol = ticker.upper().replace(".NS", "").replace(".BO", "")
 
-    # Fetch RAG evidence for bull case
     rag_growth = _get_rag_context(symbol, f"{symbol} revenue growth margins profit")
     rag_positive = _get_rag_context(symbol, f"{symbol} competitive advantage market share expansion")
 
@@ -116,7 +109,7 @@ You MUST rebut each bear argument with specific data. Do not ignore any point.""
 Format: numbered list of arguments, each with a specific data point."""
 
     try:
-        llm = get_llm(temperature=0.5, model="gpt-4o")
+        llm = get_llm(temperature=0.5, model=DEBATE_MODEL)
         response = llm.invoke(prompt)
         return response.content.strip()
     except Exception as e:
@@ -133,7 +126,6 @@ def run_bear_agent(
     """Bear Agent: argue the downside case with RAG evidence."""
     symbol = ticker.upper().replace(".NS", "").replace(".BO", "")
 
-    # Fetch RAG evidence for bear case
     rag_risks = _get_rag_context(symbol, f"{symbol} risks debt valuation concerns competition")
     rag_negative = _get_rag_context(symbol, f"{symbol} cons weakness declining")
 
@@ -168,7 +160,7 @@ You MUST challenge each bull argument with specific counter-evidence. Do not con
 Format: numbered list of arguments, each with a specific data point."""
 
     try:
-        llm = get_llm(temperature=0.5, model="gpt-4o")
+        llm = get_llm(temperature=0.5, model=DEBATE_MODEL)
         response = llm.invoke(prompt)
         return response.content.strip()
     except Exception as e:
@@ -182,11 +174,7 @@ def run_judge_agent(
     bull_arguments: list[str],
     bear_arguments: list[str],
 ) -> dict[str, Any]:
-    """Judge Agent: weigh both sides and assign a conviction score.
-
-    Returns:
-        {conviction_score (1-10), recommendation, reasoning, key_factors}
-    """
+    """Judge Agent: weigh both sides and assign a conviction score."""
     bull_text = "\n\n---\n\n".join(
         f"### Bull Round {i+1}\n{arg}" for i, arg in enumerate(bull_arguments)
     )
@@ -225,12 +213,11 @@ Respond with ONLY a JSON object (no markdown fences):
 }}"""
 
     try:
-        llm = get_llm(temperature=0.2, model="gpt-4o")
+        llm = get_llm(temperature=0.2, model=DEBATE_MODEL)
         response = llm.invoke(prompt)
         content = response.content.strip().strip("```json").strip("```").strip()
         result = json.loads(content)
 
-        # Validate required fields
         required = ["conviction_score", "recommendation", "reasoning"]
         for field in required:
             if field not in result:
@@ -268,8 +255,7 @@ def run_debate(
 ) -> dict[str, Any]:
     """Run a full multi-round debate for a single stock.
 
-    Returns:
-        {ticker, bull_arguments, bear_arguments, verdict, rounds}
+    Bull & Bear run in PARALLEL per round for speed.
     """
     stock_context = _build_stock_context(ticker, usp_cards, category_results)
 
@@ -279,23 +265,34 @@ def run_debate(
     for round_num in range(1, rounds + 1):
         logger.info("Debate %s: Round %d/%d", ticker, round_num, rounds)
 
-        # Bull goes first
-        bull_response = run_bull_agent(
-            ticker=ticker,
-            stock_context=stock_context,
-            bear_arguments=bear_args[-1] if bear_args else None,
-            round_num=round_num,
-        )
-        bull_args.append(bull_response)
+        if round_num == 1:
+            # Round 1: Bull & Bear run in parallel (no rebuttals yet)
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                bull_future = executor.submit(
+                    run_bull_agent, ticker, stock_context, None, round_num
+                )
+                bear_future = executor.submit(
+                    run_bear_agent, ticker, stock_context, None, round_num
+                )
+                bull_args.append(bull_future.result(timeout=60))
+                bear_args.append(bear_future.result(timeout=60))
+        else:
+            # Later rounds: sequential (need previous round's arguments for rebuttals)
+            bull_response = run_bull_agent(
+                ticker=ticker,
+                stock_context=stock_context,
+                bear_arguments=bear_args[-1],
+                round_num=round_num,
+            )
+            bull_args.append(bull_response)
 
-        # Bear rebuts
-        bear_response = run_bear_agent(
-            ticker=ticker,
-            stock_context=stock_context,
-            bull_arguments=bull_args[-1],
-            round_num=round_num,
-        )
-        bear_args.append(bear_response)
+            bear_response = run_bear_agent(
+                ticker=ticker,
+                stock_context=stock_context,
+                bull_arguments=bull_args[-1],
+                round_num=round_num,
+            )
+            bear_args.append(bear_response)
 
     # Judge evaluates all rounds
     verdict = run_judge_agent(
@@ -327,7 +324,6 @@ def _select_top_stocks(
             ticker = stock.get("ticker", "")
             cat_score = stock.get("weighted_score", stock.get("score", 0))
             usp_composite = usp_cards.get(ticker, {}).get("_composite", 0)
-            # Combined score: 60% screening + 40% USP
             ticker_scores[ticker] = cat_score * 0.6 + usp_composite * 0.4
 
     sorted_tickers = sorted(ticker_scores, key=ticker_scores.get, reverse=True)
@@ -335,14 +331,10 @@ def _select_top_stocks(
 
 
 def debate_node(state: dict) -> dict:
-    """LangGraph node: run Bull/Bear/Judge debate for top stocks.
-
-    Uses cycles: each stock gets 2 rounds of Bull vs Bear, then Judge.
-    """
+    """LangGraph node: run Bull/Bear/Judge debate for top stocks."""
     usp_cards = state.get("usp_cards", {})
     category_results = state.get("category_results", [])
 
-    # Select top stocks for debate
     top_tickers = _select_top_stocks(usp_cards, category_results)
     if not top_tickers:
         logger.warning("Debate Agent: No stocks to debate")

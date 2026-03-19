@@ -1,10 +1,10 @@
-"""Category Screening Agents — 3 agents that run screening categories in parallel.
+"""Category Screening Agents — 2 agents that run screening categories in parallel.
 
 Each agent wraps the corresponding category_screener function and adds
 self-assessment logic: skip if <3 stocks pass.
 
 Designed for LangGraph fan-out/fan-in:
-    regime_node -> [cat_a_node, cat_b_node, cat_c_node] -> merge_categories_node
+    regime_node -> [momentum_node, value_bottom_node] -> merge_categories_node
 """
 
 from __future__ import annotations
@@ -13,9 +13,8 @@ import logging
 from typing import Any
 
 from app.tools.screener.category_screener import (
-    screen_category_a,
-    screen_category_b,
-    screen_category_c,
+    screen_momentum,
+    screen_value_bottom,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,11 +25,8 @@ MIN_STOCKS_PER_CATEGORY = 3  # Self-assessment threshold
 def _run_category(
     category_fn,
     category_name: str,
-    price_df,
-    bulk_info: dict,
-    t2s: dict,
+    state: dict,
     regime_weights: dict,
-    progress_cb=None,
 ) -> dict[str, Any]:
     """Run a single category screener with self-assessment.
 
@@ -39,10 +35,11 @@ def _run_category(
     """
     try:
         stocks = category_fn(
-            price_df=price_df,
-            bulk_info=bulk_info,
-            t2s=t2s,
-            progress_cb=progress_cb,
+            sector_map=state.get("sector_map", {}),
+            price_df=state.get("price_df"),
+            bulk_info=state.get("bulk_info", {}),
+            t2s=state.get("t2s", {}),
+            tickers=state.get("filtered_tickers", []),
         )
 
         # Apply regime weight to each stock's score
@@ -89,51 +86,30 @@ def _run_category(
         }
 
 
-def cat_a_node(state: dict) -> dict:
-    """LangGraph node: Category A — Strengthening Industries."""
+def momentum_node(state: dict) -> dict:
+    """LangGraph node: Momentum — buy what's already working."""
     regime = state.get("regime", {})
-    weights = regime.get("weights", {"A": 1.0, "B": 1.0, "C": 1.0})
+    weights = regime.get("weights", {"Momentum": 1.0, "ValueBottom": 1.0})
 
     result = _run_category(
-        category_fn=screen_category_a,
-        category_name="A",
-        price_df=state.get("price_df"),
-        bulk_info=state.get("bulk_info", {}),
-        t2s=state.get("t2s", {}),
+        category_fn=screen_momentum,
+        category_name="Momentum",
+        state=state,
         regime_weights=weights,
     )
 
     return {"category_results": [result]}
 
 
-def cat_b_node(state: dict) -> dict:
-    """LangGraph node: Category B — Momentum."""
+def value_bottom_node(state: dict) -> dict:
+    """LangGraph node: Value Bottom — buy what nobody wants yet."""
     regime = state.get("regime", {})
-    weights = regime.get("weights", {"A": 1.0, "B": 1.0, "C": 1.0})
+    weights = regime.get("weights", {"Momentum": 1.0, "ValueBottom": 1.0})
 
     result = _run_category(
-        category_fn=screen_category_b,
-        category_name="B",
-        price_df=state.get("price_df"),
-        bulk_info=state.get("bulk_info", {}),
-        t2s=state.get("t2s", {}),
-        regime_weights=weights,
-    )
-
-    return {"category_results": [result]}
-
-
-def cat_c_node(state: dict) -> dict:
-    """LangGraph node: Category C — Value Bottoms."""
-    regime = state.get("regime", {})
-    weights = regime.get("weights", {"A": 1.0, "B": 1.0, "C": 1.0})
-
-    result = _run_category(
-        category_fn=screen_category_c,
-        category_name="C",
-        price_df=state.get("price_df"),
-        bulk_info=state.get("bulk_info", {}),
-        t2s=state.get("t2s", {}),
+        category_fn=screen_value_bottom,
+        category_name="ValueBottom",
+        state=state,
         regime_weights=weights,
     )
 
@@ -141,7 +117,7 @@ def cat_c_node(state: dict) -> dict:
 
 
 def merge_categories_node(state: dict) -> dict:
-    """LangGraph node: merge fan-in results from 3 category agents.
+    """LangGraph node: merge fan-in results from 2 category agents.
 
     Collects all survivors, deduplicates, and prepares for USP layer.
     """

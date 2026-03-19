@@ -8,7 +8,8 @@ from typing import Any, Callable
 
 import yfinance as yf
 
-from app.utils.cache import cache_get, cache_set, retry_on_error, yfinance_rate_limiter
+from app.utils.cache import cache_get, cache_set, retry_on_error, yfinance_rate_limiter, _cache, _cache_lock
+import time as _time
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,18 @@ def fetch_bulk_info(
 
     Returns {ticker: info_dict} for tickers that succeeded.
     """
+    # Fast path: check bulk in-memory cache first (avoids 483 individual SQLite lookups)
+    # Include hash of sorted tickers so different ticker sets don't collide
+    import hashlib
+    _ticker_hash = hashlib.md5("|".join(sorted(tickers)).encode()).hexdigest()[:8]
+    bulk_cache_key = f"bulk_info_all:{len(tickers)}:{_ticker_hash}"
+    bulk_cached = cache_get(bulk_cache_key)
+    if bulk_cached is not None:
+        logger.info("Bulk info: using bulk cache (%d tickers)", len(bulk_cached))
+        if progress_cb:
+            progress_cb(1.0, f"Using cached info for {len(bulk_cached)} tickers")
+        return bulk_cached
+
     results: dict[str, dict] = {}
     total = len(tickers)
 
@@ -60,16 +73,18 @@ def fetch_bulk_info(
         progress_cb(len(results) / total, f"Found {len(results)} cached, fetching {len(uncached)} remaining...")
 
     if not uncached:
+        # Store as bulk cache for fast subsequent access
+        cache_set(bulk_cache_key, results, ttl=_INFO_TTL)
         return results
 
     completed = len(results)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_ticker = {executor.submit(_fetch_single_info, t): t for t in uncached}
-        for future in as_completed(future_to_ticker):
+        for future in as_completed(future_to_ticker, timeout=300):
             ticker = future_to_ticker[future]
             completed += 1
             try:
-                info = future.result()
+                info = future.result(timeout=30)
                 if info:
                     results[ticker] = info
             except Exception as e:
@@ -79,6 +94,9 @@ def fetch_bulk_info(
                 progress_cb(completed / total, f"Fetched info: {completed}/{total} tickers...")
 
     logger.info("Bulk info: got %d / %d tickers", len(results), total)
+    # Store as bulk cache for fast subsequent access
+    if results:
+        cache_set(bulk_cache_key, results, ttl=_INFO_TTL)
     return results
 
 
