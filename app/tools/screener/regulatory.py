@@ -19,7 +19,7 @@ from app.utils.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
-_POLICY_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "policy_mapping.json")
+_POLICY_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "policy_mapping.json")
 _policy_config: dict | None = None
 
 

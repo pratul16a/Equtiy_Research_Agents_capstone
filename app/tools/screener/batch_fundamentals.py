@@ -12,8 +12,8 @@ from app.utils.cache import cache_get, cache_set, retry_on_error, yfinance_rate_
 
 logger = logging.getLogger(__name__)
 
-_INFO_TTL = 3600  # 1 hour cache for screening data
-_FINANCIALS_TTL = 3600
+_INFO_TTL = 14400  # 4 hour cache for screening data (survives restarts via disk cache)
+_FINANCIALS_TTL = 14400
 
 
 @retry_on_error(max_retries=1, base_delay=1.0)
@@ -38,7 +38,7 @@ def _fetch_single_info(ticker: str) -> dict | None:
 def fetch_bulk_info(
     tickers: list[str],
     progress_cb: Callable[[float, str], None] | None = None,
-    max_workers: int = 4,
+    max_workers: int = 16,
 ) -> dict[str, dict]:
     """Fetch .info for multiple tickers using ThreadPoolExecutor.
 

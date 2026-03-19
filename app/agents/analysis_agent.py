@@ -50,7 +50,13 @@ def analysis_node(state: dict) -> dict:
         llm_with_tools = create_analysis_agent(ticker)
         tool_map = {t.name: t for t in ALL_ANALYSIS_TOOLS}
 
-        financials_summary = json.dumps(state.get("financials", {}), indent=2, default=str)[:3000]
+        # Build per-section financial summary to preserve key data across all sections
+        financials_raw = state.get("financials", {})
+        financials_sections = []
+        for section_key, section_data in financials_raw.items():
+            section_str = json.dumps(section_data, indent=2, default=str)
+            financials_sections.append(f"### {section_key}\n{section_str[:3000]}")
+        financials_summary = "\n\n".join(financials_sections)[:12000]
 
         prompt = ANALYSIS_AGENT_PROMPT.format(ticker=ticker)
         messages = [

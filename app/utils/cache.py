@@ -1,16 +1,20 @@
-"""TTL-based in-memory cache and retry utilities for API calls."""
+"""TTL-based in-memory cache, SQLite disk cache, and retry utilities for API calls."""
 
 from __future__ import annotations
 
 import functools
+import json
 import logging
+import os
+import pickle
+import sqlite3
 import time
 from threading import Lock
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
-# ── TTL Cache ────────────────────────────────────────────────
+# ── TTL In-Memory Cache ──────────────────────────────────────
 
 _cache: dict[str, tuple[float, Any]] = {}
 _cache_lock = Lock()
@@ -19,20 +23,32 @@ DEFAULT_TTL = 300  # 5 minutes
 
 
 def cache_get(key: str) -> Any | None:
-    """Get a value from the cache if it exists and hasn't expired."""
+    """Get a value from in-memory cache, then fall back to disk cache."""
+    # Check in-memory first
     with _cache_lock:
         if key in _cache:
             expiry, value = _cache[key]
             if time.time() < expiry:
                 return value
             del _cache[key]
+
+    # Fall back to disk cache
+    disk_val = disk_cache_get(key)
+    if disk_val is not None:
+        # Promote to in-memory cache
+        with _cache_lock:
+            _cache[key] = (time.time() + DEFAULT_TTL, disk_val)
+        return disk_val
+
     return None
 
 
 def cache_set(key: str, value: Any, ttl: int = DEFAULT_TTL) -> None:
-    """Store a value in the cache with a TTL in seconds."""
+    """Store a value in both in-memory and disk cache."""
     with _cache_lock:
         _cache[key] = (time.time() + ttl, value)
+    # Also persist to disk with longer TTL
+    disk_cache_set(key, value, ttl=max(ttl, DISK_CACHE_TTL))
 
 
 def cache_clear() -> None:
@@ -124,6 +140,80 @@ def retry_on_error(
     return decorator
 
 
+# ── SQLite Disk Cache ────────────────────────────────────────
+
+DISK_CACHE_TTL = 14400  # 4 hours — survives process restarts
+_DISK_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "data", "cache.db",
+)
+_disk_cache_lock = Lock()
+_disk_conn: sqlite3.Connection | None = None
+
+
+def _get_disk_conn() -> sqlite3.Connection:
+    """Get or create the SQLite connection (lazy init)."""
+    global _disk_conn
+    if _disk_conn is None:
+        os.makedirs(os.path.dirname(_DISK_CACHE_PATH), exist_ok=True)
+        _disk_conn = sqlite3.connect(_DISK_CACHE_PATH, check_same_thread=False)
+        _disk_conn.execute(
+            "CREATE TABLE IF NOT EXISTS cache "
+            "(key TEXT PRIMARY KEY, value BLOB, expiry REAL)"
+        )
+        _disk_conn.execute("CREATE INDEX IF NOT EXISTS idx_expiry ON cache(expiry)")
+        _disk_conn.commit()
+    return _disk_conn
+
+
+def disk_cache_get(key: str) -> Any | None:
+    """Get a value from the SQLite disk cache."""
+    try:
+        with _disk_cache_lock:
+            conn = _get_disk_conn()
+            row = conn.execute(
+                "SELECT value, expiry FROM cache WHERE key = ?", (key,)
+            ).fetchone()
+            if row is None:
+                return None
+            value_blob, expiry = row
+            if time.time() > expiry:
+                conn.execute("DELETE FROM cache WHERE key = ?", (key,))
+                conn.commit()
+                return None
+            return pickle.loads(value_blob)
+    except Exception as e:
+        logger.debug("Disk cache get failed for %s: %s", key, e)
+        return None
+
+
+def disk_cache_set(key: str, value: Any, ttl: int = DISK_CACHE_TTL) -> None:
+    """Store a value in the SQLite disk cache."""
+    try:
+        with _disk_cache_lock:
+            conn = _get_disk_conn()
+            blob = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+            conn.execute(
+                "INSERT OR REPLACE INTO cache (key, value, expiry) VALUES (?, ?, ?)",
+                (key, blob, time.time() + ttl),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug("Disk cache set failed for %s: %s", key, e)
+
+
+def disk_cache_cleanup() -> int:
+    """Remove expired entries from disk cache. Returns count removed."""
+    try:
+        with _disk_cache_lock:
+            conn = _get_disk_conn()
+            cursor = conn.execute("DELETE FROM cache WHERE expiry < ?", (time.time(),))
+            conn.commit()
+            return cursor.rowcount
+    except Exception:
+        return 0
+
+
 # ── Rate Limiter ─────────────────────────────────────────────
 
 class RateLimiter:
@@ -148,8 +238,47 @@ class RateLimiter:
             self._last_call = time.time()
 
 
-# Global rate limiter for yfinance calls (2 calls/sec max)
-yfinance_rate_limiter = RateLimiter(calls_per_second=2.0)
+# Global rate limiter for yfinance calls (10 calls/sec — raised from 5)
+yfinance_rate_limiter = RateLimiter(calls_per_second=10.0)
+
+
+# ── Circuit Breaker ──────────────────────────────────────────
+
+class CircuitBreaker:
+    """Trip after `threshold` consecutive failures; auto-reset after `reset_seconds`."""
+
+    def __init__(self, threshold: int = 3, reset_seconds: float = 300.0):
+        self._threshold = threshold
+        self._reset_seconds = reset_seconds
+        self._failures = 0
+        self._tripped_at: float | None = None
+        self._lock = Lock()
+
+    @property
+    def is_open(self) -> bool:
+        with self._lock:
+            if self._tripped_at is None:
+                return False
+            if time.time() - self._tripped_at > self._reset_seconds:
+                self._failures = 0
+                self._tripped_at = None
+                return False
+            return True
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._failures += 1
+            if self._failures >= self._threshold:
+                self._tripped_at = time.time()
+
+    def record_success(self) -> None:
+        with self._lock:
+            self._failures = 0
+            self._tripped_at = None
+
+
+# Global circuit breaker for BSE API (trips after 3 failures, resets in 5min)
+bse_circuit_breaker = CircuitBreaker(threshold=3, reset_seconds=300.0)
 
 
 def get_yf_ticker(ticker: str):

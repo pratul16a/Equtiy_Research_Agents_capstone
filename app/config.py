@@ -65,28 +65,34 @@ MCP_SERVERS = {
 }
 
 
-def get_llm():
+def get_llm(temperature: float = 0.2, model: str | None = None):
     """Return a configured ChatModel instance based on available API keys.
+
+    Args:
+        temperature: LLM temperature (0.1 for analysis, 0.2 default, 0.7 for debate).
+        model: Override model name. None uses LLM_MODEL from env.
 
     Priority: OpenRouter > Google Gemini > OpenAI.
     """
+    model_name = model or LLM_MODEL
+
     if OPENROUTER_API_KEY:
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model=LLM_MODEL,
+            model=model_name,
             api_key=OPENROUTER_API_KEY,
             base_url=OPENROUTER_BASE_URL,
-            temperature=0.2,
+            temperature=temperature,
             default_headers={"HTTP-Referer": "https://indian-equity-analyst.local"},
         )
     elif GOOGLE_API_KEY:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         return ChatGoogleGenerativeAI(
-            model=LLM_MODEL,
+            model=model_name,
             google_api_key=GOOGLE_API_KEY,
-            temperature=0.2,
+            temperature=temperature,
         )
     elif OPENAI_API_KEY:
         from langchain_openai import ChatOpenAI
@@ -94,7 +100,7 @@ def get_llm():
         return ChatOpenAI(
             model="gpt-4o",
             api_key=OPENAI_API_KEY,
-            temperature=0.2,
+            temperature=temperature,
         )
     else:
         raise ValueError(

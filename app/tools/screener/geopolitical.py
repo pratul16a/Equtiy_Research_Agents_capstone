@@ -16,7 +16,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "geopolitical_config.json")
+_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "geopolitical_config.json")
 _config: dict | None = None
 
 

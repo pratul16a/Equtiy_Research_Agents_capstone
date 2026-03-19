@@ -295,6 +295,79 @@ def compute_sector_relative_strength(
     return results
 
 
+def compute_sector_profit_growth(
+    sector_map: dict[str, list[str]],
+    bulk_info: dict[str, dict],
+) -> dict[str, dict[str, Any]]:
+    """Compute average last-quarter profit growth per sector.
+
+    Used by Category A: Identify sectors with avg profit growth >= 10%.
+
+    Returns: {sector: {"avg_growth": float, "stocks_with_data": int, "above_threshold": bool}}
+    """
+    from app.tools.screener.batch_fundamentals import fetch_ticker_financials
+
+    sector_results: dict[str, dict[str, Any]] = {}
+
+    for sector, tickers in sector_map.items():
+        growth_values: list[float] = []
+
+        for ticker in tickers:
+            if ticker not in bulk_info:
+                continue
+            try:
+                data = fetch_ticker_financials(ticker)
+                fin = data.get("financials")
+                if fin is None or len(fin.columns) < 2:
+                    continue
+
+                # Net income for most recent 2 years
+                ni_recent = None
+                ni_prev = None
+                for field in ["Net Income", "Net Income Common Stockholders"]:
+                    val = fin.iloc[:, 0].get(field)
+                    if val is not None:
+                        try:
+                            ni_recent = float(val)
+                        except (ValueError, TypeError):
+                            pass
+                        break
+
+                for field in ["Net Income", "Net Income Common Stockholders"]:
+                    val = fin.iloc[:, 1].get(field)
+                    if val is not None:
+                        try:
+                            ni_prev = float(val)
+                        except (ValueError, TypeError):
+                            pass
+                        break
+
+                if ni_recent is not None and ni_prev is not None and ni_prev > 0:
+                    growth = ((ni_recent - ni_prev) / abs(ni_prev)) * 100
+                    growth_values.append(growth)
+            except Exception as e:
+                logger.debug("Sector profit growth failed for %s: %s", ticker, e)
+
+        if growth_values:
+            avg_growth = sum(growth_values) / len(growth_values)
+            sector_results[sector] = {
+                "avg_growth": round(avg_growth, 2),
+                "stocks_with_data": len(growth_values),
+                "above_threshold": avg_growth >= 10.0,
+            }
+        else:
+            sector_results[sector] = {
+                "avg_growth": 0.0,
+                "stocks_with_data": 0,
+                "above_threshold": False,
+            }
+
+    logger.info("Sector profit growth: %d sectors computed, %d above 10%%",
+                len(sector_results),
+                sum(1 for v in sector_results.values() if v["above_threshold"]))
+    return sector_results
+
+
 def get_sector_outperformers(
     price_df: pd.DataFrame,
     sector_map: dict[str, list[str]],

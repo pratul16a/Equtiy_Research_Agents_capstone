@@ -48,7 +48,7 @@ def data_node(state: dict) -> dict:
         tool_map = {t.name: t for t in tools}
 
         messages = [
-            {"role": "system", "content": DATA_AGENT_PROMPT},
+            {"role": "system", "content": DATA_AGENT_PROMPT.format(ticker=ticker)},
             {"role": "user", "content": f"Gather all available financial data for Indian stock: {ticker}"},
         ]
 

@@ -12,7 +12,7 @@ from urllib.parse import quote_plus
 import feedparser
 import requests
 
-from app.utils.cache import cache_get, cache_set, retry_on_error, yfinance_rate_limiter
+from app.utils.cache import cache_get, cache_set, retry_on_error, yfinance_rate_limiter, bse_circuit_breaker
 from app.tools.screener.batch_fundamentals import fetch_ticker_financials
 
 logger = logging.getLogger(__name__)
@@ -103,9 +103,13 @@ def screen_insider_transactions(
 # ── BSE announcement keyword search ─────────────────────────
 
 
-@retry_on_error(max_retries=1, base_delay=2.0, exceptions=(requests.RequestException,))
+@retry_on_error(max_retries=0, base_delay=1.0, exceptions=(requests.RequestException, ValueError))
 def _fetch_bse_announcements(base_name: str, count: int = 20) -> list[dict]:
     """Fetch BSE announcements for a ticker."""
+    # Circuit breaker: skip if BSE API is consistently failing
+    if bse_circuit_breaker.is_open:
+        return []
+
     cache_key = f"screener_bse:{base_name}"
     cached = cache_get(cache_key)
     if cached is not None:
@@ -121,9 +125,15 @@ def _fetch_bse_announcements(base_name: str, count: int = 20) -> list[dict]:
         "strType": "C",
     }
 
-    response = requests.get(url, params=params, headers=_BSE_HEADERS, timeout=15)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.get(url, params=params, headers=_BSE_HEADERS, timeout=2)
+        response.raise_for_status()
+        data = response.json()
+    except Exception:
+        bse_circuit_breaker.record_failure()
+        raise
+
+    bse_circuit_breaker.record_success()
 
     announcements = []
     items = []

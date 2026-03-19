@@ -31,6 +31,7 @@ INDIAN_SECTOR_PEERS: dict[str, list[str]] = {
     "Communication Services": ["BHARTIARTL.NS", "TATACOMM.NS"],
     "Industrials": ["LT.NS", "ADANIENT.NS", "ADANIPORTS.NS", "SIEMENS.NS", "ABB.NS", "HAL.NS"],
     "Utilities": ["NTPC.NS", "POWERGRID.NS", "TATAPOWER.NS", "ADANIGREEN.NS", "NHPC.NS"],
+    "Consumer Internet": ["ZOMATO.NS", "NYKAA.NS", "POLICYBZR.NS", "PAYTM.NS", "CARTRADE.NS", "EASEMYTRIP.NS"],
 }
 
 # Broader sector aliases to map yfinance sector names to our mapping
@@ -60,6 +61,10 @@ SECTOR_ALIASES: dict[str, str] = {
     "Capital Goods": "Industrials",
     "Infrastructure": "Industrials",
     "Utilities": "Utilities",
+    "Consumer Internet": "Consumer Internet",
+    "Internet & Direct Marketing Retail": "Consumer Internet",
+    "Internet Software & Services": "Consumer Internet",
+    "Internet Content & Information": "Consumer Internet",
 }
 
 

@@ -91,7 +91,7 @@ def screen_pb_vs_historical(
     price_df: pd.DataFrame,
     sector_map: dict[str, str],
 ) -> list[dict[str, Any]]:
-    """Screen for stocks with current P/B below 4-year average P/B."""
+    """Screen for stocks with current P/B below 5-year average P/B."""
     results: list[dict] = []
 
     for ticker, info in bulk_info.items():
@@ -108,7 +108,7 @@ def screen_pb_vs_historical(
 
             # Compute historical P/B for each year
             historical_pbs: list[float] = []
-            for i in range(min(4, len(bs.columns))):
+            for i in range(min(5, len(bs.columns))):
                 equity = None
                 for field in ["Stockholders Equity", "Total Equity Gross Minority Interest",
                               "Common Stock Equity"]:
@@ -143,7 +143,7 @@ def screen_pb_vs_historical(
                         "ticker": ticker,
                         "sector": sector_map.get(ticker, "Other"),
                         "current_pb": round(current_pb, 2),
-                        "avg_pb_4yr": round(avg_pb, 2),
+                        "avg_pb_5yr": round(avg_pb, 2),
                         "discount_pct": round((1 - current_pb / avg_pb) * 100, 1),
                         "passed": True,
                     })
@@ -159,7 +159,7 @@ def screen_ps_vs_historical(
     price_df: pd.DataFrame,
     sector_map: dict[str, str],
 ) -> list[dict[str, Any]]:
-    """Screen for stocks with current P/S below 4-year average P/S."""
+    """Screen for stocks with current P/S below 5-year average P/S."""
     results: list[dict] = []
 
     for ticker, info in bulk_info.items():
@@ -175,7 +175,7 @@ def screen_ps_vs_historical(
                 continue
 
             historical_pss: list[float] = []
-            for i in range(min(4, len(fin.columns))):
+            for i in range(min(5, len(fin.columns))):
                 revenue = _safe_float(fin.iloc[:, i].get("Total Revenue"))
                 if not revenue or revenue <= 0:
                     continue
@@ -199,7 +199,7 @@ def screen_ps_vs_historical(
                         "ticker": ticker,
                         "sector": sector_map.get(ticker, "Other"),
                         "current_ps": round(current_ps, 2),
-                        "avg_ps_4yr": round(avg_ps, 2),
+                        "avg_ps_5yr": round(avg_ps, 2),
                         "discount_pct": round((1 - current_ps / avg_ps) * 100, 1),
                         "passed": True,
                     })

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -87,7 +88,7 @@ with st.sidebar:
 
     analysis_mode = st.radio(
         "Mode",
-        ["Stock Analysis", "Market Breadth", "Stock Screener", "Stock Deep Dive"],
+        ["Stock Screener", "Stock Analysis", "Market Breadth", "Stock Deep Dive"],
         horizontal=True,
         key="analysis_mode_radio",
     )
@@ -105,6 +106,8 @@ with st.sidebar:
     run_breadth = False
     run_screener = False
     run_deep_dive = False
+    run_debate = False
+    selected_cats = ["A", "B", "C"]
     ticker = ""
     exchange = "NSE"
 
@@ -142,61 +145,21 @@ with st.sidebar:
         run_breadth = st.button("Run Breadth Analysis", type="primary", use_container_width=True)
 
     elif analysis_mode == "Stock Screener":
-        st.markdown("Screen Nifty 500 stocks using fundamental and qualitative criteria.")
+        st.markdown("**3-Category AI Screening** with USP analysis + Bull/Bear debate.")
 
-        screener_universe = st.selectbox(
-            "Universe",
-            ["Full Nifty 500", "Strong Sectors from Breadth"],
-            index=0,
-            help="'Strong Sectors' requires running Market Breadth first.",
+        screener_categories = st.multiselect(
+            "Categories",
+            ["A: Strengthening Industries", "B: Momentum", "C: Value Bottoms"],
+            default=["A: Strengthening Industries", "B: Momentum", "C: Value Bottoms"],
+            help="Select which screening categories to run.",
         )
+        # Extract category letters
+        selected_cats = [c[0] for c in screener_categories]
 
-        st.markdown("**Quantitative:**")
-        criteria_options = {
-            "roe": st.checkbox("ROE < 10% (2 years)", value=True),
-            "pb_vs_historical": st.checkbox("P/B below 4yr avg", value=True),
-            "ps_vs_historical": st.checkbox("P/S below 4yr avg", value=True),
-        }
+        run_debate = st.checkbox("Run AI Debate (top 5 stocks)", value=True,
+                                help="Bull vs Bear debate for top stocks. Adds ~60s.")
 
-        st.markdown("**Financial Quality:**")
-        criteria_options.update({
-            "debt_reduction": st.checkbox("Debt reduction trend", value=True),
-            "opm_improvement": st.checkbox("Improving operating margins", value=True),
-            "cf_turnaround": st.checkbox("Cash flow turnaround", value=True),
-            "dividend_initiation": st.checkbox("Dividend initiation/resumption", value=False),
-        })
-
-        st.markdown("**Technical:**")
-        criteria_options.update({
-            "above_200dma": st.checkbox("Price above 200 DMA", value=True),
-            "volume_breakout": st.checkbox("Volume breakout (2x)", value=False),
-        })
-
-        st.markdown("**Governance:**")
-        criteria_options.update({
-            "low_pledge": st.checkbox("Strong promoter holding", value=True),
-            "increasing_institutional": st.checkbox("Institutional interest", value=False),
-        })
-
-        st.markdown("**Qualitative:**")
-        criteria_options.update({
-            "capacity_utilization": st.checkbox("Low capacity utilization", value=True),
-            "insider_buying": st.checkbox("Insider buying activity", value=True),
-            "capex": st.checkbox("New capex announcements", value=True),
-            "new_business": st.checkbox("New business / diversification", value=True),
-            "order_booking": st.checkbox("Order booking announcements", value=True),
-        })
-
-        st.markdown("**USP Screens:**")
-        criteria_options.update({
-            "geopolitical": st.checkbox("Geopolitical resilience", value=True),
-            "smart_money_lag": st.checkbox("Smart money lag", value=False),
-            "regulatory_tailwind": st.checkbox("Regulatory tailwind", value=True),
-            "promoter_anomaly": st.checkbox("Promoter behavior", value=False),
-        })
-
-        screener_min_score = st.slider("Minimum criteria score", 1, 20, 3)
-        run_screener = st.button("Run Screener", type="primary", use_container_width=True)
+        run_screener = st.button("Run Category Screener", type="primary", use_container_width=True)
 
     elif analysis_mode == "Stock Deep Dive":
         st.markdown("### Stock Deep Dive")
@@ -220,11 +183,15 @@ with st.sidebar:
     st.divider()
     st.markdown("### About")
     st.markdown("""
-    **Agents:**
-    - **Data Agent** -- Fetches financials & BSE/NSE filings
-    - **Analysis Agent** -- Ratios, ROCE, DCF (Indian WACC), peers
-    - **Sentiment Agent** -- Indian news & sentiment scoring
-    - **Report Agent** -- Investment memo with RAG context
+    **12-Agent System:**
+    - **Regime Agent** -- Bull/bear/rotation detection
+    - **3 Category Agents** -- Sector, momentum, value screens
+    - **Validation Agent** -- USP scoring (5 dimensions)
+    - **Bull/Bear/Judge** -- AI debate with RAG evidence
+    - **Data Agent** -- Incremental financials & filings
+    - **Analysis Agent** -- ROCE, DCF, peer comparison
+    - **Sentiment Agent** -- Recent news & events
+    - **Report Agent** -- Investment memo synthesis
     """)
 
 
@@ -239,6 +206,8 @@ if "breadth_data" not in st.session_state:
     st.session_state.breadth_data = None
 if "screener_data" not in st.session_state:
     st.session_state.screener_data = None
+if "category_screener_data" not in st.session_state:
+    st.session_state.category_screener_data = None
 if "deep_dive_profile" not in st.session_state:
     st.session_state.deep_dive_profile = None
 if "deep_dive_messages" not in st.session_state:
@@ -518,13 +487,13 @@ def render_screener_stock_detail(stocks: list[dict]):
 
 
 def render_screener_export(screener_data: dict):
-    """Render CSV and JSON export buttons."""
+    """Render CSV, JSON, and PDF export buttons."""
     stocks = screener_data.get("stocks", [])
     if not stocks:
         return
 
     st.markdown("### Export Results")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     # CSV export
     with col1:
@@ -552,6 +521,22 @@ def render_screener_export(screener_data: dict):
             file_name=f"screener_results_{datetime.now().strftime('%Y%m%d')}.json",
             mime="application/json",
         )
+
+    # PDF export
+    with col3:
+        try:
+            from app.sharing import generate_screener_pdf
+            cdata = st.session_state.get("category_screener_data")
+            if cdata:
+                pdf_bytes = generate_screener_pdf(cdata)
+                st.download_button(
+                    "Download PDF",
+                    data=pdf_bytes,
+                    file_name=f"screener_report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                )
+        except Exception as e:
+            st.error(f"PDF export failed: {e}")
 
 
 # ── Stock Analysis Render Functions ─────────────────────────
@@ -1006,19 +991,96 @@ def render_investment_score(score_data):
             st.text(summary)
 
 
+def _render_sharing_buttons(report: str, ticker: str, score_data: dict, key_suffix: str = ""):
+    """Reusable sharing buttons for any report context."""
+    recommendation = score_data.get("recommendation", "HOLD")
+    composite_score = score_data.get("composite_score", 0)
+
+    st.markdown("#### Share Report")
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.download_button(
+            label="Download .md",
+            data=report,
+            file_name=f"report_{ticker}_{datetime.now():%Y%m%d}.md",
+            mime="text/markdown",
+            key=f"dl_md_{key_suffix}",
+        )
+
+    with col2:
+        try:
+            from app.sharing import generate_report_pdf
+            pdf_bytes = generate_report_pdf(report, ticker, recommendation, composite_score)
+            st.download_button(
+                label="Download PDF",
+                data=pdf_bytes,
+                file_name=f"report_{ticker}_{datetime.now():%Y%m%d}.pdf",
+                mime="application/pdf",
+                key=f"dl_pdf_{key_suffix}",
+            )
+        except Exception as e:
+            st.error(f"PDF generation failed: {e}")
+
+    with col3:
+        from app.sharing import is_email_configured
+        if is_email_configured():
+            with st.popover("Email Report", use_container_width=True):
+                recipient = st.text_input("Recipient Email", key=f"email_to_{key_suffix}")
+                if st.button("Send", key=f"email_send_{key_suffix}"):
+                    if recipient:
+                        from app.sharing import generate_report_pdf, send_email_with_pdf
+                        pdf = generate_report_pdf(report, ticker, recommendation, composite_score)
+                        ok, msg = send_email_with_pdf(
+                            recipient,
+                            f"Equity Research: {ticker} - {recommendation}",
+                            f"AI-generated equity research report for {ticker}.\n"
+                            f"Recommendation: {recommendation} | Score: {composite_score}/100.\n\n"
+                            f"Report generated on {datetime.now().strftime('%d %b %Y')}.",
+                            pdf,
+                            f"report_{ticker}.pdf",
+                        )
+                        if ok:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
+                    else:
+                        st.warning("Enter a recipient email.")
+        else:
+            st.button("Email (set SMTP in .env)", disabled=True, key=f"email_dis_{key_suffix}")
+
+    with col4:
+        from app.sharing import is_whatsapp_configured, send_whatsapp_report
+        if is_whatsapp_configured():
+            with st.popover("WhatsApp", use_container_width=True):
+                wa_phone = st.text_input(
+                    "Phone (e.g. 919876543210)",
+                    value=os.getenv("WHATSAPP_DEFAULT_PHONE", ""),
+                    key=f"wa_phone_{key_suffix}",
+                )
+                if st.button("Send on WhatsApp", key=f"wa_send_{key_suffix}"):
+                    if wa_phone:
+                        ok, msg = send_whatsapp_report(wa_phone, ticker, recommendation, composite_score)
+                        if ok:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
+                    else:
+                        st.warning("Enter a phone number.")
+        else:
+            st.button("WhatsApp (set Twilio)", disabled=True, key=f"wa_dis_{key_suffix}")
+
+
 def render_report(report):
-    """Render the final investment report."""
+    """Render the final investment report with sharing options."""
     if not report:
         return
     st.markdown("### Investment Research Report")
     st.markdown(report)
 
-    st.download_button(
-        label="Download Report as Markdown",
-        data=report,
-        file_name=f"indian_equity_report_{st.session_state.last_ticker}_{datetime.now().strftime('%Y%m%d')}.md",
-        mime="text/markdown",
-    )
+    ticker = st.session_state.get("last_ticker", "UNKNOWN")
+    score_data = st.session_state.get("research_state", {}).get("investment_score", {})
+    _render_sharing_buttons(report, ticker, score_data, key_suffix="main")
 
 
 # ── Ticker Validation ────────────────────────────────────────
@@ -1233,72 +1295,386 @@ if analysis_mode == "Stock Deep Dive":
 
     st.stop()
 
-# ── Stock Screener Mode ──────────────────────────────────────
+# ── Stock Screener Mode (New 4-Tab Layout) ───────────────────
 if analysis_mode == "Stock Screener":
     if run_screener:
-        # Determine universe
-        universe_key = "nifty500"
-        breadth_for_screener = None
-        if screener_universe == "Strong Sectors from Breadth":
-            if st.session_state.breadth_data:
-                universe_key = "strong_sectors"
-                breadth_for_screener = st.session_state.breadth_data
-            else:
-                st.warning("Run Market Breadth analysis first to use Strong Sectors mode. Falling back to Full Nifty 500.")
+        progress_bar = st.progress(0, text="Starting 3-category screener...")
 
-        selected_criteria = [k for k, v in criteria_options.items() if v]
-        if not selected_criteria:
-            st.warning("Please select at least one screening criterion.")
-        else:
-            progress_bar = st.progress(0, text="Starting stock screener...")
+        def _cat_progress(fraction: float, message: str):
+            progress_bar.progress(min(fraction, 1.0), text=message)
 
-            def _screener_progress(fraction: float, message: str):
-                progress_bar.progress(min(fraction, 1.0), text=message)
-
+        try:
+            # Run regime detection first
+            _cat_progress(0.01, "Detecting market regime...")
             try:
-                from app.tools.screener import run_stock_screener
-                st.session_state.screener_data = run_stock_screener(
-                    universe=universe_key,
-                    criteria=selected_criteria,
-                    min_score=screener_min_score,
-                    breadth_data=breadth_for_screener,
-                    progress_cb=_screener_progress,
-                    max_stocks=50 if test_mode else None,
-                )
-                progress_bar.empty()
-                st.success("Stock screening complete!")
+                from app.agents.regime_agent import detect_regime
+                regime_data = detect_regime(use_llm=False)
             except Exception as e:
-                progress_bar.empty()
-                st.error(f"Screener failed: {e}")
+                regime_data = {"regime": "mixed", "reasoning": f"Detection failed: {e}", "weights": {"A": 1.0, "B": 1.0, "C": 1.0}}
 
-    sdata = st.session_state.screener_data
-    if sdata:
-        render_screener_summary(sdata["summary"])
-        st.divider()
-        render_screener_table(sdata["stocks"], sdata.get("criteria_used", []))
-        st.divider()
-        render_screener_stock_detail(sdata["stocks"])
-        st.divider()
-        render_screener_export(sdata)
+            from app.tools.screener.category_screener import run_category_screener
+            result = run_category_screener(
+                categories=selected_cats,
+                progress_cb=_cat_progress,
+                max_stocks=50 if test_mode else None,
+            )
+            result["regime_data"] = regime_data
+            st.session_state.category_screener_data = result
+
+            # Run debate if requested
+            if run_debate and result.get("category_results"):
+                progress_bar.progress(0.85, text="Running AI debate for top stocks...")
+                try:
+                    from app.agents.debate_agents import run_debate as _run_debate, _select_top_stocks
+                    from app.ui.usp_cards import transform_usp_data
+
+                    usp_cards = transform_usp_data(result.get("usp_scores", {}))
+                    cat_results = result.get("category_results", {})
+                    # Convert dict {cat: [stocks]} to list [{category, stocks}]
+                    if isinstance(cat_results, dict):
+                        cat_list = [{"category": k, "stocks": v} for k, v in cat_results.items()]
+                    else:
+                        cat_list = cat_results
+
+                    top_tickers = _select_top_stocks(usp_cards, cat_list, max_stocks=5)
+                    debate_results = []
+                    for t in top_tickers:
+                        dr = _run_debate(ticker=t, usp_cards=usp_cards, category_results=cat_list)
+                        debate_results.append(dr)
+                    result["debate_results"] = debate_results
+                    result["usp_cards"] = usp_cards
+                    st.session_state.category_screener_data = result
+                except Exception as e:
+                    st.warning(f"Debate phase failed (non-fatal): {e}")
+
+            progress_bar.empty()
+            st.success("Category screening complete!")
+        except Exception as e:
+            progress_bar.empty()
+            st.error(f"Category screener failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+    cdata = st.session_state.category_screener_data
+    if cdata:
+        # ── Regime Banner ────────────────────────────────────
+        regime = cdata.get("regime_data", {})
+        if regime:
+            regime_name = regime.get("regime", "mixed").upper()
+            regime_colors = {"BULL": "#2ecc71", "BEAR": "#e74c3c", "ROTATION": "#f39c12", "MIXED": "#95a5a6"}
+            color = regime_colors.get(regime_name, "#95a5a6")
+            vix = regime.get("vix")
+            vix_text = f" | VIX: {vix:.1f}" if vix else ""
+            st.markdown(
+                f'<div style="background:{color}20; border:2px solid {color}; border-radius:10px; padding:12px; margin-bottom:16px;">'
+                f'<span style="font-size:1.3rem; font-weight:700; color:{color};">Market Regime: {regime_name}</span>'
+                f'<span style="margin-left:20px; color:#666;">{regime.get("reasoning", "")}{vix_text}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # ── 4 Tabs ───────────────────────────────────────────
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "Screening Results",
+            "USP Analysis",
+            "AI Debate",
+            "Deep Dive",
+        ])
+
+        # ── Tab 1: Screening Results ─────────────────────────
+        with tab1:
+            # Summary metrics
+            summary = cdata.get("summary", {})
+            if summary:
+                sc1, sc2, sc3, sc4 = st.columns(4)
+                with sc1:
+                    st.metric("Universe", summary.get("universe_size", "?"))
+                with sc2:
+                    st.metric("After Tech Filter", summary.get("after_tech_filter", "?"))
+                with sc3:
+                    st.metric("With Fundamentals", summary.get("with_fundamentals", "?"))
+                with sc4:
+                    st.metric("Total Survivors", summary.get("total_survivors", "?"))
+                st.divider()
+
+            cat_results = cdata.get("category_results", {})
+            if isinstance(cat_results, dict):
+                cat_items = cat_results.items()
+            else:
+                cat_items = [(c.get("category", "?"), c) for c in cat_results]
+
+            cat_colors = {"A": "#3498db", "B": "#2ecc71", "C": "#e67e22"}
+            cat_labels = {"A": "Strengthening Industries", "B": "Momentum", "C": "Value Bottoms"}
+
+            for cat_key, cat_data in cat_items:
+                stocks = cat_data if isinstance(cat_data, list) else cat_data.get("stocks", [])
+                skipped = cat_data.get("skipped", False) if isinstance(cat_data, dict) else False
+                reason = cat_data.get("reason", "") if isinstance(cat_data, dict) else ""
+                color = cat_colors.get(cat_key, "#95a5a6")
+                label = cat_labels.get(cat_key, cat_key)
+
+                with st.expander(
+                    f"Category {cat_key}: {label} — {len(stocks)} stocks"
+                    + (" (SKIPPED)" if skipped else ""),
+                    expanded=not skipped,
+                ):
+                    if skipped:
+                        st.info(f"Category skipped: {reason}")
+                    elif stocks:
+                        rows = []
+                        for s in stocks:
+                            criteria = s.get("criteria_passed", [])
+                            rows.append({
+                                "Ticker": s.get("ticker", ""),
+                                "Sector": s.get("sector", ""),
+                                "Score": s.get("weighted_score", s.get("score", 0)),
+                                "Criteria Met": len(criteria) if isinstance(criteria, list) else criteria,
+                                "Criteria": ", ".join(criteria) if isinstance(criteria, list) else str(criteria),
+                            })
+                        df = pd.DataFrame(rows)
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No stocks passed this category's criteria.")
+
+            # Universe info
+            universe = cdata.get("universe_info", {})
+            if universe:
+                st.caption(
+                    f"Universe: {universe.get('ticker_count', '?')} tickers | "
+                    f"Technical filter survivors: {universe.get('technical_survivors', '?')}"
+                )
+
+            # Export & Share buttons
+            st.divider()
+            st.markdown("#### Export & Share")
+            ex1, ex2, ex3, ex4 = st.columns(4)
+            with ex1:
+                json_data = json.dumps(cdata, indent=2, default=str)
+                st.download_button("Download JSON", data=json_data,
+                                   file_name=f"screener_{datetime.now():%Y%m%d}.json",
+                                   mime="application/json", key="tab1_json")
+            with ex2:
+                try:
+                    from app.sharing import generate_screener_pdf
+                    pdf_bytes = generate_screener_pdf(cdata)
+                    st.download_button("Download PDF", data=pdf_bytes,
+                                       file_name=f"screener_{datetime.now():%Y%m%d}.pdf",
+                                       mime="application/pdf", key="tab1_pdf")
+                except Exception as e:
+                    st.error(f"PDF failed: {e}")
+            with ex3:
+                from app.sharing import is_email_configured
+                if is_email_configured():
+                    with st.popover("Email Report", use_container_width=True):
+                        recip = st.text_input("Recipient", key="screener_email_to")
+                        if st.button("Send", key="screener_email_send"):
+                            if recip:
+                                from app.sharing import generate_screener_pdf, send_email_with_pdf
+                                pdf = generate_screener_pdf(cdata)
+                                ok, msg = send_email_with_pdf(
+                                    recip,
+                                    f"Stock Screener Report - {regime_name} Regime",
+                                    f"AI-generated screener report.\nRegime: {regime_name}\n"
+                                    f"Generated: {datetime.now().strftime('%d %b %Y')}",
+                                    pdf, f"screener_{datetime.now():%Y%m%d}.pdf",
+                                )
+                                st.success(msg) if ok else st.error(msg)
+                else:
+                    st.button("Email (set SMTP)", disabled=True, key="screener_email_dis")
+            with ex4:
+                from app.sharing import is_whatsapp_configured, send_whatsapp_screener
+                all_tickers = []
+                for v in (cat_results.values() if isinstance(cat_results, dict) else cat_results):
+                    stocks = v if isinstance(v, list) else v.get("stocks", [])
+                    all_tickers.extend(s.get("ticker", "") for s in stocks[:3])
+                if is_whatsapp_configured():
+                    with st.popover("WhatsApp", use_container_width=True):
+                        scr_phone = st.text_input(
+                            "Phone (e.g. 919876543210)",
+                            value=os.getenv("WHATSAPP_DEFAULT_PHONE", ""),
+                            key="scr_wa_phone",
+                        )
+                        if st.button("Send on WhatsApp", key="scr_wa_send"):
+                            if scr_phone:
+                                ok, msg = send_whatsapp_screener(
+                                    scr_phone,
+                                    total_stocks=summary.get("total_survivors", 0),
+                                    regime=regime_name,
+                                    top_picks=all_tickers[:5],
+                                )
+                                st.success(msg) if ok else st.error(msg)
+                            else:
+                                st.warning("Enter a phone number.")
+                else:
+                    st.button("WhatsApp (set Twilio)", disabled=True, key="scr_wa_dis")
+
+        # ── Tab 2: USP Analysis ──────────────────────────────
+        with tab2:
+            from app.ui.usp_cards import (
+                render_usp_heatmap,
+                render_usp_card,
+                render_usp_radar,
+                render_contradiction_alerts,
+            )
+
+            usp_cards = cdata.get("usp_cards", {})
+            if not usp_cards and cdata.get("usp_scores"):
+                from app.ui.usp_cards import transform_usp_data
+                usp_cards = transform_usp_data(cdata["usp_scores"])
+
+            if usp_cards:
+                # Layer 1: Heatmap
+                st.markdown("### USP Heatmap")
+                render_usp_heatmap(usp_cards)
+
+                # Layer 2: Contradiction Alerts
+                cat_results_list = cdata.get("category_results", [])
+                if isinstance(cat_results_list, dict):
+                    cat_results_list = [{"category": k, "stocks": v} if isinstance(v, list) else v
+                                       for k, v in cat_results_list.items()]
+                render_contradiction_alerts(
+                    {c.get("category", ""): c.get("stocks", []) for c in cat_results_list},
+                    usp_cards,
+                )
+
+                # Layer 3: Expandable USP Cards
+                st.markdown("### Per-Stock USP Analysis")
+                for ticker in sorted(usp_cards.keys(),
+                                    key=lambda t: usp_cards[t].get("_composite", 0),
+                                    reverse=True):
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        render_usp_card(ticker, usp_cards[ticker])
+                    with col2:
+                        render_usp_radar(ticker, usp_cards[ticker])
+            else:
+                st.info("No USP data available. Run the screener first.")
+
+        # ── Tab 3: AI Debate ─────────────────────────────────
+        with tab3:
+            debate_results = cdata.get("debate_results", [])
+            if debate_results:
+                st.markdown("### Bull vs Bear Debate")
+                for debate in debate_results:
+                    ticker = debate.get("ticker", "?")
+                    verdict = debate.get("verdict", {})
+                    conviction = verdict.get("conviction_score", 5)
+                    rec = verdict.get("recommendation", "HOLD")
+
+                    # Conviction color
+                    if conviction >= 7:
+                        conv_color = "#2ecc71"
+                    elif conviction >= 5:
+                        conv_color = "#f39c12"
+                    else:
+                        conv_color = "#e74c3c"
+
+                    with st.expander(
+                        f"{ticker} — {rec} (Conviction: {conviction}/10)",
+                        expanded=True,
+                    ):
+                        # Verdict banner
+                        st.markdown(
+                            f'<div style="background:{conv_color}20; border:2px solid {conv_color}; '
+                            f'border-radius:8px; padding:12px; margin-bottom:12px;">'
+                            f'<span style="font-size:1.2rem; font-weight:700; color:{conv_color};">'
+                            f'{rec} — Conviction {conviction}/10</span><br>'
+                            f'<span style="color:#666;">{verdict.get("reasoning", "")}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+
+                        # Key factors
+                        factors = verdict.get("key_factors", [])
+                        if factors:
+                            st.markdown("**Key Factors:** " + " | ".join(factors))
+
+                        # Side-by-side Bull vs Bear
+                        col_bull, col_bear = st.columns(2)
+                        with col_bull:
+                            st.markdown("#### Bull Case")
+                            for i, arg in enumerate(debate.get("bull_arguments", []), 1):
+                                st.markdown(f"**Round {i}:**")
+                                st.markdown(arg)
+                        with col_bear:
+                            st.markdown("#### Bear Case")
+                            for i, arg in enumerate(debate.get("bear_arguments", []), 1):
+                                st.markdown(f"**Round {i}:**")
+                                st.markdown(arg)
+
+                        # Strength meters
+                        bull_str = verdict.get("bull_strength", 5)
+                        bear_str = verdict.get("bear_strength", 5)
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.progress(bull_str / 10, text=f"Bull strength: {bull_str}/10")
+                        with c2:
+                            st.progress(bear_str / 10, text=f"Bear strength: {bear_str}/10")
+            else:
+                st.info("No debate results. Enable 'Run AI Debate' in the sidebar and run the screener.")
+
+        # ── Tab 4: Deep Dive ─────────────────────────────────
+        with tab4:
+            st.markdown("### Quick Deep Dive")
+            st.markdown("Select a stock from the screening results to run a full deep dive.")
+
+            # Collect all recommended tickers
+            all_screened = []
+            cat_results = cdata.get("category_results", {})
+            if isinstance(cat_results, dict):
+                for cat_data in cat_results.values():
+                    stocks = cat_data if isinstance(cat_data, list) else cat_data.get("stocks", [])
+                    for s in stocks:
+                        t = s.get("ticker", "")
+                        if t and t not in all_screened:
+                            all_screened.append(t)
+            elif isinstance(cat_results, list):
+                for cat_data in cat_results:
+                    for s in cat_data.get("stocks", []):
+                        t = s.get("ticker", "")
+                        if t and t not in all_screened:
+                            all_screened.append(t)
+
+            if all_screened:
+                selected_ticker = st.selectbox("Select stock for deep dive", all_screened)
+                if st.button("Run Deep Dive", type="primary"):
+                    with st.spinner(f"Running deep dive for {selected_ticker}..."):
+                        try:
+                            from app.graph import run_research
+                            result = run_research(selected_ticker)
+                            st.session_state.research_state = result
+                            st.session_state.last_ticker = selected_ticker
+                            st.success(f"Deep dive complete for {selected_ticker}!")
+
+                            # Render report if available
+                            report = result.get("final_report", "")
+                            if report:
+                                st.markdown(report)
+                                score_data = result.get("investment_score", {})
+                                _render_sharing_buttons(report, selected_ticker, score_data, key_suffix="dd")
+                        except Exception as e:
+                            st.error(f"Deep dive failed: {e}")
+            else:
+                st.info("Run the screener first to see stocks for deep dive.")
+
     else:
+        # Landing page
+        st.markdown("### 3-Category AI Stock Screener")
         st.markdown("""
-        ### Fundamental Stock Screener
+        Click **Run Category Screener** in the sidebar to analyze Nifty 500 stocks across:
 
-        Click **Run Screener** in the sidebar to screen Nifty 500 stocks using:
+        **Category A: Strengthening Industries** — Top-down sector play with policy/geo tailwinds
 
-        **Quantitative Criteria:**
-        - ROE < 10% for last 2 years (turnaround candidates)
-        - P/B below 4-year average (value opportunity)
-        - P/S below 4-year average (revenue discount)
-        - Low capacity utilization (asset turnover proxy)
+        **Category B: Momentum** — Price + fundamental inflection (RSI, MA alignment, QoQ growth)
 
-        **Qualitative Criteria:**
-        - Insider buying activity
-        - New capex / capacity expansion announcements
-        - New business / diversification signals
-        - Order booking announcements
+        **Category C: Value Bottoms** — Contrarian turnaround candidates (low ROE, cheap P/B, capex catalysts)
 
-        First run takes ~3-5 minutes for Full Nifty 500. Subsequent runs use cached data.
+        **After screening:**
+        - USP Analysis (5 dimensions: Geopolitical, Smart Money, Regulatory, Management, Promoter)
+        - AI Debate (Bull vs Bear with RAG evidence for top 5 stocks)
+        - Deep Dive (full research report for any selected stock)
+
+        First run takes 2-4 minutes. Subsequent runs use cached data.
         """)
 
     st.stop()

@@ -240,3 +240,97 @@ def screen_dividend_initiation(
 
     logger.info("Dividend initiation screen: %d stocks passed", len(results))
     return results
+
+
+def screen_qoq_profit_growth(
+    bulk_info: dict[str, dict],
+    sector_map: dict[str, str],
+    min_growth: float = 10.0,
+    min_quarters: int = 2,
+) -> list[dict[str, Any]]:
+    """Screen for stocks with QoQ profit growth > min_growth% for last min_quarters quarters.
+
+    Used by Category B: sustained earnings momentum.
+
+    Args:
+        bulk_info: {ticker: info_dict} from yfinance.
+        sector_map: {ticker: sector} lookup.
+        min_growth: Minimum QoQ profit growth % (default 10%).
+        min_quarters: Number of consecutive quarters required (default 2).
+    """
+    results: list[dict] = []
+
+    for ticker in bulk_info:
+        try:
+            data = fetch_ticker_financials(ticker)
+            fin = data.get("financials")
+            if fin is None:
+                continue
+
+            # yfinance .quarterly_financials — try to get quarterly data
+            import yfinance as yf
+            from app.utils.cache import cache_get as _cg, cache_set as _cs, yfinance_rate_limiter as _rl
+
+            qcache_key = f"quarterly_fin:{ticker}"
+            qfin = _cg(qcache_key)
+            if qfin is None:
+                _rl.wait()
+                stock = yf.Ticker(ticker)
+                qfin = stock.quarterly_financials
+                if qfin is not None and not qfin.empty:
+                    _cs(qcache_key, qfin, ttl=3600)
+                else:
+                    continue
+
+            if qfin is None or len(qfin.columns) < min_quarters + 1:
+                continue
+
+            # Extract net income per quarter (columns are most recent first)
+            profits: list[dict] = []
+            for i in range(min(min_quarters + 2, len(qfin.columns))):
+                net_income = None
+                for field in ["Net Income", "Net Income Common Stockholders"]:
+                    net_income = _safe_float(qfin.iloc[:, i].get(field))
+                    if net_income is not None:
+                        break
+                if net_income is not None:
+                    quarter_label = str(qfin.columns[i])[:10]
+                    profits.append({"quarter": quarter_label, "net_income": net_income})
+
+            if len(profits) < min_quarters + 1:
+                continue
+
+            # Check QoQ growth for last min_quarters consecutive quarters
+            consecutive_growth = 0
+            growth_rates: list[dict] = []
+            for i in range(len(profits) - 1):
+                prev = profits[i + 1]["net_income"]
+                curr = profits[i]["net_income"]
+                if prev and prev > 0:
+                    growth = ((curr - prev) / abs(prev)) * 100
+                    growth_rates.append({
+                        "quarter": profits[i]["quarter"],
+                        "growth_pct": round(growth, 2),
+                    })
+                    if growth >= min_growth:
+                        consecutive_growth += 1
+                    else:
+                        break
+                else:
+                    break
+
+            if consecutive_growth >= min_quarters:
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "consecutive_quarters": consecutive_growth,
+                    "growth_rates": growth_rates[:consecutive_growth],
+                    "latest_growth_pct": growth_rates[0]["growth_pct"] if growth_rates else None,
+                    "passed": True,
+                })
+        except Exception as e:
+            logger.debug("QoQ profit growth check failed for %s: %s", ticker, e)
+
+    logger.info("QoQ profit growth screen (>%s%% for %d quarters): %d stocks passed",
+                min_growth, min_quarters, len(results))
+    return results

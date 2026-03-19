@@ -158,7 +158,7 @@ def report_node(state: dict) -> dict:
 
         indian_metrics = state.get("indian_metrics", {})
         if indian_metrics:
-            context_parts.append(f"**Indian-Specific Metrics (Promoter/FII/DII/ROCE):**\n{json.dumps(indian_metrics, indent=2, default=str)[:2000]}")
+            context_parts.append(f"**Indian-Specific Metrics (Promoter/FII/DII/ROCE):**\n{json.dumps(indian_metrics, indent=2, default=str)[:8000]}")
 
         dcf = state.get("dcf_valuation", {})
         if dcf:
@@ -182,7 +182,7 @@ def report_node(state: dict) -> dict:
 
         commentary = state.get("management_commentary", "")
         if commentary:
-            context_parts.append(f"**Management Commentary / Sentiment Detail:**\n{commentary[:1500]}")
+            context_parts.append(f"**Management Commentary / Sentiment Detail:**\n{commentary[:6000]}")
 
         corporate_actions = state.get("corporate_actions", [])
         if corporate_actions:
@@ -190,8 +190,8 @@ def report_node(state: dict) -> dict:
 
         financials = state.get("financials", {})
         if financials:
-            fin_str = json.dumps(financials, indent=2, default=str)[:4000]
-            context_parts.append(f"**Raw Financial Data (truncated, in INR):**\n{fin_str}")
+            fin_str = json.dumps(financials, indent=2, default=str)[:12000]
+            context_parts.append(f"**Raw Financial Data (in INR):**\n{fin_str}")
 
         full_context = "\n\n".join(context_parts)
 

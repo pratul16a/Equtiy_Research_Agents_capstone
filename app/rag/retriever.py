@@ -61,3 +61,63 @@ def search(query: str, k: int = 5) -> list[dict]:
         }
         for doc in docs
     ]
+
+
+def search_by_symbol(query: str, symbol: str, k: int = 5) -> list[dict]:
+    """Search RAG index filtered by stock symbol.
+
+    Uses FAISS similarity search with metadata post-filtering.
+    This ensures Bull Agent debating RELIANCE only gets RELIANCE chunks.
+
+    Args:
+        query: Search query text.
+        symbol: Stock symbol to filter by (e.g., "RELIANCE").
+        k: Number of results to return.
+
+    Returns:
+        List of {content, metadata} dicts, filtered to the given symbol.
+    """
+    if k is None:
+        k = RETRIEVER_K
+
+    index_path = FAISS_INDEX_PATH
+    index_dir = Path(index_path)
+
+    if not index_dir.exists() or not (index_dir / "index.faiss").exists():
+        return []
+
+    try:
+        from langchain_community.vectorstores import FAISS
+
+        # Try local embeddings first, fall back to API
+        try:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        except ImportError:
+            embeddings = get_embeddings()
+
+        vectorstore = FAISS.load_local(
+            str(index_path),
+            embeddings,
+            allow_dangerous_deserialization=True,
+        )
+
+        # Search with higher k, then filter by symbol
+        clean_symbol = symbol.upper().replace(".NS", "").replace(".BO", "")
+        docs = vectorstore.similarity_search(query, k=k * 3)
+
+        filtered = []
+        for doc in docs:
+            if doc.metadata.get("symbol", "").upper() == clean_symbol:
+                filtered.append({
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                })
+                if len(filtered) >= k:
+                    break
+
+        return filtered
+
+    except Exception as e:
+        print(f"Warning: Symbol-filtered search failed: {e}")
+        return []
