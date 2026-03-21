@@ -7,9 +7,11 @@ langchain-community>=0.3.0
 langchain-text-splitters>=0.3.0
 langchain-mcp-adapters>=0.1.0
 
+#testing
 # MCP SDK
 mcp[cli]>=1.2.0
 
+#testingg
 # UI
 streamlit>=1.32.0
 plotly>=5.18.0
