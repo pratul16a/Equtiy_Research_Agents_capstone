@@ -224,7 +224,9 @@ def _merge_and_evaluate_gates(
     if disabled_criteria is None:
         disabled_criteria = set()
 
-    # Step 1: build per-stock criteria sets (same as _merge_and_score)
+    # Step 1: build per-stock criteria sets
+    # Screens may return all stocks with passed=True/False, or only passing stocks.
+    # Only count a criterion as "passed" if stock["passed"] is True (default for legacy screens).
     stock_data: dict[str, dict[str, Any]] = {}
     for criterion, stocks in screen_results.items():
         for stock in stocks:
@@ -237,8 +239,11 @@ def _merge_and_evaluate_gates(
                     "criteria_passed": [],
                     "criteria_details": {},
                 }
-            stock_data[ticker]["criteria_passed"].append(criterion)
+            # Always store details (raw data) for export/debugging
             stock_data[ticker]["criteria_details"][criterion] = stock
+            # Only count as passed if the screen marked it as passed
+            if stock.get("passed", True):
+                stock_data[ticker]["criteria_passed"].append(criterion)
 
     # Step 2: evaluate gates and overall score per stock
     result: list[dict[str, Any]] = []

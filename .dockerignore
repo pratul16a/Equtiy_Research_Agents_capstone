@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+tests/
+*.md
+equity_agent_readme/
+mockup_preview.html

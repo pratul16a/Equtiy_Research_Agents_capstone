@@ -28,16 +28,15 @@ def screen_promoter_holding_strong(
         except (ValueError, TypeError):
             continue
 
-        if held_pct > threshold:
-            results.append({
-                "ticker": ticker,
-                "sector": sector_map.get(ticker, "Other"),
-                "promoter_holding_pct": round(held_pct * 100, 2),
-                "threshold": round(threshold * 100, 1),
-                "passed": True,
-            })
+        results.append({
+            "ticker": ticker,
+            "sector": sector_map.get(ticker, "Other"),
+            "promoter_holding_pct": round(held_pct * 100, 2),
+            "threshold": round(threshold * 100, 1),
+            "passed": held_pct > threshold,
+        })
 
-    logger.info("Promoter holding screen (>%s%%): %d stocks passed", threshold * 100, len(results))
+    logger.info("Promoter holding screen (>%s%%): %d stocks passed", threshold * 100, sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -62,15 +61,14 @@ def screen_institutional_increasing(
         except (ValueError, TypeError):
             continue
 
-        if held_pct > threshold:
-            results.append({
-                "ticker": ticker,
-                "sector": sector_map.get(ticker, "Other"),
-                "institutional_holding_pct": round(held_pct * 100, 2),
-                "passed": True,
-            })
+        results.append({
+            "ticker": ticker,
+            "sector": sector_map.get(ticker, "Other"),
+            "institutional_holding_pct": round(held_pct * 100, 2),
+            "passed": held_pct > threshold,
+        })
 
-    logger.info("Institutional holding screen (>%s%%): %d stocks passed", threshold * 100, len(results))
+    logger.info("Institutional holding screen (>%s%%): %d stocks passed", threshold * 100, sum(1 for r in results if r["passed"]))
     return results
 
 

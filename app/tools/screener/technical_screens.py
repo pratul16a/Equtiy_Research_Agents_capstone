@@ -36,20 +36,19 @@ def screen_above_200dma(
             if pd.isna(current_dma) or current_dma <= 0:
                 continue
 
-            if current_price > current_dma:
-                pct_above = round((current_price / current_dma - 1) * 100, 2)
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "current_price": round(current_price, 2),
-                    "dma_200": round(current_dma, 2),
-                    "pct_above_200dma": pct_above,
-                    "passed": True,
-                })
+            pct_above = round((current_price / current_dma - 1) * 100, 2)
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "current_price": round(current_price, 2),
+                "dma_200": round(current_dma, 2),
+                "pct_above_200dma": pct_above,
+                "passed": current_price > current_dma,
+            })
         except Exception as e:
             logger.debug("200 DMA check failed for %s: %s", ticker, e)
 
-    logger.info("200 DMA screen: %d stocks above 200 DMA", len(results))
+    logger.info("200 DMA screen: %d stocks above 200 DMA", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -79,19 +78,18 @@ def screen_golden_alignment(
             if any(pd.isna(v) or v <= 0 for v in [dma_50, dma_200]):
                 continue
 
-            if current_price > dma_50 > dma_200:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "current_price": round(current_price, 2),
-                    "dma_50": round(dma_50, 2),
-                    "dma_200": round(dma_200, 2),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "current_price": round(current_price, 2),
+                "dma_50": round(dma_50, 2),
+                "dma_200": round(dma_200, 2),
+                "passed": current_price > dma_50 > dma_200,
+            })
         except Exception as e:
             logger.debug("Golden alignment check failed for %s: %s", ticker, e)
 
-    logger.info("Golden alignment screen: %d stocks passed", len(results))
+    logger.info("Golden alignment screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -122,19 +120,18 @@ def screen_near_52w_high(
                 continue
 
             pct_from_high = (high_52w - current_price) / high_52w
-            if pct_from_high <= threshold:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "current_price": round(current_price, 2),
-                    "high_52w": round(high_52w, 2),
-                    "pct_from_high": round(pct_from_high * 100, 2),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "current_price": round(current_price, 2),
+                "high_52w": round(high_52w, 2),
+                "pct_from_high": round(pct_from_high * 100, 2),
+                "passed": pct_from_high <= threshold,
+            })
         except Exception as e:
             logger.debug("Near 52W high check failed for %s: %s", ticker, e)
 
-    logger.info("Near 52W high screen (within %s%%): %d stocks passed", threshold * 100, len(results))
+    logger.info("Near 52W high screen (within %s%%): %d stocks passed", threshold * 100, sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -173,19 +170,18 @@ def screen_macd_bullish(
             if pd.isna(macd_val) or pd.isna(signal_val):
                 continue
 
-            if macd_val > signal_val:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "macd": round(macd_val, 2),
-                    "signal_line": round(signal_val, 2),
-                    "histogram": round(hist_val, 2),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "macd": round(macd_val, 2),
+                "signal_line": round(signal_val, 2),
+                "histogram": round(hist_val, 2),
+                "passed": macd_val > signal_val,
+            })
         except Exception as e:
             logger.debug("MACD bullish check failed for %s: %s", ticker, e)
 
-    logger.info("MACD bullish screen: %d stocks passed", len(results))
+    logger.info("MACD bullish screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -248,19 +244,18 @@ def screen_obv_rising(
             obv_now = float(obv.iloc[-1])
             obv_ago = float(obv.iloc[-lookback])
 
-            if obv_now > obv_ago:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "obv_current": int(obv_now),
-                    "obv_20d_ago": int(obv_ago),
-                    "obv_change_pct": round((obv_now - obv_ago) / max(abs(obv_ago), 1) * 100, 2),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "obv_current": int(obv_now),
+                "obv_20d_ago": int(obv_ago),
+                "obv_change_pct": round((obv_now - obv_ago) / max(abs(obv_ago), 1) * 100, 2),
+                "passed": obv_now > obv_ago,
+            })
         except Exception as e:
             logger.debug("OBV rising check failed for %s: %s", ticker, e)
 
-    logger.info("OBV rising screen (%dd): %d stocks passed", lookback, len(results))
+    logger.info("OBV rising screen (%dd): %d stocks passed", lookback, sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -322,19 +317,18 @@ def screen_volume_breakout(
                 continue
 
             volume_ratio = avg_5d / avg_50d
-            if volume_ratio > 2.0:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "avg_volume_5d": int(avg_5d),
-                    "avg_volume_50d": int(avg_50d),
-                    "volume_ratio": round(volume_ratio, 2),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "avg_volume_5d": int(avg_5d),
+                "avg_volume_50d": int(avg_50d),
+                "volume_ratio": round(volume_ratio, 2),
+                "passed": volume_ratio > 2.0,
+            })
         except Exception as e:
             logger.debug("Volume breakout check failed for %s: %s", ticker, e)
 
-    logger.info("Volume breakout screen: %d stocks with breakout", len(results))
+    logger.info("Volume breakout screen: %d stocks with breakout", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -388,18 +382,17 @@ def screen_rsi_range(
             if pd.isna(current_rsi):
                 continue
 
-            if lo <= current_rsi <= hi:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "rsi": round(current_rsi, 2),
-                    "rsi_range": f"{lo}-{hi}",
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "rsi": round(current_rsi, 2),
+                "rsi_range": f"{lo}-{hi}",
+                "passed": lo <= current_rsi <= hi,
+            })
         except Exception as e:
             logger.debug("RSI range check failed for %s: %s", ticker, e)
 
-    logger.info("RSI range screen (%s-%s): %d stocks passed", lo, hi, len(results))
+    logger.info("RSI range screen (%s-%s): %d stocks passed", lo, hi, sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -427,18 +420,17 @@ def screen_rsi_oversold(
             if pd.isna(current_rsi):
                 continue
 
-            if current_rsi < threshold:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector_map.get(ticker, "Other"),
-                    "rsi": round(current_rsi, 2),
-                    "threshold": threshold,
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector_map.get(ticker, "Other"),
+                "rsi": round(current_rsi, 2),
+                "threshold": threshold,
+                "passed": current_rsi < threshold,
+            })
         except Exception as e:
             logger.debug("RSI oversold check failed for %s: %s", ticker, e)
 
-    logger.info("RSI oversold screen (<%s): %d stocks passed", threshold, len(results))
+    logger.info("RSI oversold screen (<%s): %d stocks passed", threshold, sum(1 for r in results if r["passed"]))
     return results
 
 

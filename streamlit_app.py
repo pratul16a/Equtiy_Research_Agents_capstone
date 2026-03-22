@@ -2006,7 +2006,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
 
         # Export buttons
         st.divider()
-        ex1, ex2 = st.columns(2)
+        ex1, ex2, ex3 = st.columns(3)
         with ex1:
             json_data = json.dumps(cdata, indent=2, default=str)
             st.download_button("Download JSON", data=json_data,
@@ -2021,6 +2021,46 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                                    mime="application/pdf", key=f"{category_key}_pdf")
             except Exception as e:
                 st.button("PDF unavailable", disabled=True, key=f"{category_key}_pdf_dis")
+        with ex3:
+            try:
+                # Flat raw data columns per criteria
+                all_criteria = MOMENTUM_CRITERIA if category_key == "Momentum" else VALUE_CRITERIA
+                csv_rows = []
+                for s in stocks:
+                    row = {
+                        "Ticker": s.get("ticker", ""),
+                        "Sector": s.get("sector", ""),
+                        "Tier": s.get("tier_label", s.get("tier", "")),
+                        "Score": s.get("score", 0),
+                        "Active_Total": s.get("active_total", ""),
+                        "All_Gates_Pass": s.get("all_gates_pass", ""),
+                    }
+                    # Gate results
+                    for g in s.get("gate_results", []):
+                        row[f"Gate:{g['name']}"] = "PASS" if g["passed"] else "FAIL"
+                        row[f"Gate:{g['name']}:detail"] = f"{g['passed_count']}/{g['active_count']}"
+                    # Per-criteria raw data — auto-capture all fields from screen results
+                    details = s.get("criteria_details", {})
+                    passed_set = set(s.get("criteria_passed", []))
+                    for ckey in all_criteria:
+                        row[f"{ckey}"] = "PASS" if ckey in passed_set else ("FAIL" if ckey in details else "")
+                        if ckey in details:
+                            d = details[ckey]
+                            for dk, dv in d.items():
+                                if dk in ("ticker", "passed", "sector"):
+                                    continue
+                                row[f"{ckey}:{dk}"] = str(dv) if isinstance(dv, (list, dict)) else dv
+                    csv_rows.append(row)
+                if csv_rows:
+                    raw_df = pd.DataFrame(csv_rows)
+                    raw_csv = raw_df.to_csv(index=False)
+                    st.download_button("Download Raw Data CSV", data=raw_csv,
+                                       file_name=f"{category_key}_raw_data_{datetime.now():%Y%m%d}.csv",
+                                       mime="text/csv", key=f"{category_key}_raw_csv")
+                else:
+                    st.button("No data to export", disabled=True, key=f"{category_key}_raw_dis")
+            except Exception as e:
+                st.button(f"CSV error: {e}", disabled=True, key=f"{category_key}_raw_err")
 
     # Tab 2: USP Analysis
     with tab2:

@@ -70,19 +70,20 @@ def screen_roe(
                     year_label = str(fin.columns[i])[:10]
                     roe_years.append({"year": year_label, "roe": round(roe_val * 100, 2)})
 
-            if len(roe_years) >= 2 and all(y["roe"] < 10.0 for y in roe_years[:2]):
+            if len(roe_years) >= 2:
                 current_roe = _safe_float(bulk_info.get(ticker, {}).get("returnOnEquity"))
+                is_pass = all(y["roe"] < 10.0 for y in roe_years[:2])
                 results.append({
                     "ticker": ticker,
                     "sector": sector_map.get(ticker, "Other"),
                     "current_roe": round(current_roe * 100, 2) if current_roe else None,
                     "roe_history": roe_years,
-                    "passed": True,
+                    "passed": is_pass,
                 })
         except Exception as e:
             logger.debug("ROE deep check failed for %s: %s", ticker, e)
 
-    logger.info("ROE screen: %d stocks passed", len(results))
+    logger.info("ROE screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -138,19 +139,18 @@ def screen_pb_vs_historical(
 
             if len(historical_pbs) >= 2:
                 avg_pb = sum(historical_pbs) / len(historical_pbs)
-                if current_pb < avg_pb:
-                    results.append({
-                        "ticker": ticker,
-                        "sector": sector_map.get(ticker, "Other"),
-                        "current_pb": round(current_pb, 2),
-                        "avg_pb_5yr": round(avg_pb, 2),
-                        "discount_pct": round((1 - current_pb / avg_pb) * 100, 1),
-                        "passed": True,
-                    })
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "current_pb": round(current_pb, 2),
+                    "avg_pb_5yr": round(avg_pb, 2),
+                    "discount_pct": round((1 - current_pb / avg_pb) * 100, 1),
+                    "passed": current_pb < avg_pb,
+                })
         except Exception as e:
             logger.debug("P/B historical check failed for %s: %s", ticker, e)
 
-    logger.info("P/B screen: %d stocks passed", len(results))
+    logger.info("P/B screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -194,19 +194,18 @@ def screen_ps_vs_historical(
 
             if len(historical_pss) >= 2:
                 avg_ps = sum(historical_pss) / len(historical_pss)
-                if current_ps < avg_ps:
-                    results.append({
-                        "ticker": ticker,
-                        "sector": sector_map.get(ticker, "Other"),
-                        "current_ps": round(current_ps, 2),
-                        "avg_ps_5yr": round(avg_ps, 2),
-                        "discount_pct": round((1 - current_ps / avg_ps) * 100, 1),
-                        "passed": True,
-                    })
+                results.append({
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "Other"),
+                    "current_ps": round(current_ps, 2),
+                    "avg_ps_5yr": round(avg_ps, 2),
+                    "discount_pct": round((1 - current_ps / avg_ps) * 100, 1),
+                    "passed": current_ps < avg_ps,
+                })
         except Exception as e:
             logger.debug("P/S historical check failed for %s: %s", ticker, e)
 
-    logger.info("P/S screen: %d stocks passed", len(results))
+    logger.info("P/S screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -296,22 +295,23 @@ def screen_roe_above(
         roe_pass = roe is not None and roe > threshold
         growth_pass = rev_growth is not None and rev_growth > revenue_growth_threshold
 
-        if roe_pass or growth_pass:
-            reason = []
-            if roe_pass:
-                reason.append(f"ROE {roe * 100:.1f}%")
-            if growth_pass:
-                reason.append(f"RevGrowth {rev_growth * 100:.1f}%")
+        is_pass = roe_pass or growth_pass
+        reason = []
+        if roe_pass:
+            reason.append(f"ROE {roe * 100:.1f}%")
+        if growth_pass:
+            reason.append(f"RevGrowth {rev_growth * 100:.1f}%")
+        if roe is not None or rev_growth is not None:
             results.append({
                 "ticker": ticker,
                 "sector": sector_map.get(ticker, "Other"),
                 "current_roe": round(roe * 100, 2) if roe is not None else None,
                 "revenue_growth_yoy": round(rev_growth * 100, 2) if rev_growth is not None else None,
-                "reason": " + ".join(reason),
-                "passed": True,
+                "reason": " + ".join(reason) if reason else "",
+                "passed": is_pass,
             })
 
-    logger.info("ROE/Growth screen: %d stocks passed", len(results))
+    logger.info("ROE/Growth screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -346,17 +346,16 @@ def screen_ev_ebitda_below_median(
     for sector, values in sector_values.items():
         median = sector_medians[sector]
         for ticker, ev_ebitda in values:
-            if ev_ebitda < median:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector,
-                    "ev_ebitda": round(ev_ebitda, 2),
-                    "sector_median": round(median, 2),
-                    "discount_pct": round((1 - ev_ebitda / median) * 100, 1),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector,
+                "ev_ebitda": round(ev_ebitda, 2),
+                "sector_median": round(median, 2),
+                "discount_pct": round((1 - ev_ebitda / median) * 100, 1),
+                "passed": ev_ebitda < median,
+            })
 
-    logger.info("EV/EBITDA below median screen: %d stocks passed", len(results))
+    logger.info("EV/EBITDA below median screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results
 
 
@@ -398,14 +397,13 @@ def screen_fcf_yield_above_sector(
     for sector, values in sector_yields.items():
         avg = sector_avgs[sector]
         for ticker, fcf_yield in values:
-            if fcf_yield > avg and fcf_yield > 0:
-                results.append({
-                    "ticker": ticker,
-                    "sector": sector,
-                    "fcf_yield": round(fcf_yield * 100, 2),
-                    "sector_avg": round(avg * 100, 2),
-                    "passed": True,
-                })
+            results.append({
+                "ticker": ticker,
+                "sector": sector,
+                "fcf_yield": round(fcf_yield * 100, 2),
+                "sector_avg": round(avg * 100, 2),
+                "passed": fcf_yield > avg and fcf_yield > 0,
+            })
 
-    logger.info("FCF yield above sector avg screen: %d stocks passed", len(results))
+    logger.info("FCF yield above sector avg screen: %d stocks passed", sum(1 for r in results if r["passed"]))
     return results

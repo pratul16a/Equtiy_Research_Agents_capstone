@@ -151,7 +151,7 @@ TIER_ORDER = ["buy_zone", "watchlist", "monitor", "near_miss", "failed"]
 # Monitor: all gates pass + score >= monitor (but < watchlist)
 # Near Miss: 0 hard failures + exactly 1 soft failure + score >= near_miss_score
 MOMENTUM_TIER_THRESHOLDS = {"buy_zone": 10, "watchlist": 9, "monitor": 8, "near_miss_score": 9}
-VALUE_TIER_THRESHOLDS = {"buy_zone": 22, "watchlist": 20, "monitor": 18, "near_miss_score": 18}
+VALUE_TIER_THRESHOLDS = {"buy_zone": 20, "watchlist": 17, "monitor": 15, "near_miss_score": 18}
 
 
 # ── Gate Evaluation Engine ────────────────────────────────────
