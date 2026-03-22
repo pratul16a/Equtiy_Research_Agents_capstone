@@ -233,10 +233,19 @@ def transform_usp_data(usp_raw: dict[str, dict]) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
 
     for ticker, modules in usp_raw.items():
+        if ticker.startswith("_"):
+            # Preserve meta keys like _portfolio_insights
+            result[ticker] = modules
+            continue
+
         result[ticker] = {}
         composite_scores = []
 
         for module_name, raw_data in modules.items():
+            if module_name.startswith("_"):
+                # Preserve _commentary and other meta keys
+                result[ticker][module_name] = raw_data
+                continue
             transformer = _TRANSFORMERS.get(module_name)
             if transformer:
                 card = transformer(raw_data)
@@ -266,7 +275,9 @@ def render_usp_heatmap(usp_cards: dict[str, dict[str, Any]]) -> None:
 
     # Build table data
     rows = []
-    for ticker, modules in sorted(usp_cards.items(), key=lambda x: x[1].get("_composite", 0), reverse=True):
+    for ticker, modules in sorted(usp_cards.items(), key=lambda x: x[1].get("_composite", 0) if isinstance(x[1], dict) else 0, reverse=True):
+        if ticker.startswith("_"):
+            continue
         row = {"Stock": ticker}
         for dim in dimensions:
             card = modules.get(dim, {})
@@ -320,6 +331,17 @@ def render_usp_card(ticker: str, usp_data: dict[str, Any]) -> None:
             summary = card.get("summary", "")
             if summary:
                 st.caption(summary)
+
+            # LLM Commentary (if available)
+            commentary = usp_data.get("_commentary", {})
+            if dim in commentary:
+                st.markdown(
+                    f'<div style="background: #1a1f2e; border-left: 3px solid #00D4AA; '
+                    f'padding: 10px 14px; border-radius: 4px; margin: 8px 0; '
+                    f'font-size: 0.9em; color: #E0E0E0;">'
+                    f'{commentary[dim]}</div>',
+                    unsafe_allow_html=True,
+                )
 
             st.divider()
 
@@ -421,4 +443,19 @@ def render_contradiction_alerts(
 
     if alerts:
         for alert in alerts:
-            st.warning(f"⚠️ CONTRADICTION: {alert}")
+            st.warning(f"CONTRADICTION: {alert}")
+
+
+def render_portfolio_insights(insights_text: str) -> None:
+    """Render cross-stock portfolio-level USP insights."""
+    if not insights_text:
+        return
+
+    st.markdown("### Portfolio-Level USP Insights")
+    st.markdown(
+        f'<div style="background: linear-gradient(135deg, #1a1f2e 0%, #0E1117 100%); '
+        f'border: 1px solid #00D4AA; border-radius: 8px; padding: 16px 20px; '
+        f'margin-bottom: 16px;">'
+        f'{insights_text}</div>',
+        unsafe_allow_html=True,
+    )

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 MIN_STOCKS_PER_CATEGORY = 3  # Self-assessment threshold
 
-
+# V4
 def _run_category(
     category_fn,
     category_name: str,

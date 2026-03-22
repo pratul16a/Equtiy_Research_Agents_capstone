@@ -55,10 +55,10 @@
       "event_risk": {"monsoon_sensitivity": 0.1, "election_sensitivity": 0.5}
     },
     "Utilities": {
-      "trade_risk": {"export_sensitivity": 0.1, "china_plus_one_benefit": 0.1, "import_dependency": 0.4},
-      "policy_risk": {"regulatory_sensitivity": 0.8, "govt_scheme_dependency": 0.7, "rate_sensitivity": 0.6},
-      "commodity_risk": {"crude_sensitivity": 0.6, "raw_material_import": 0.5},
-      "event_risk": {"monsoon_sensitivity": 0.3, "election_sensitivity": 0.5}
+      "trade_risk": {"export_sensitivity": 0.05, "china_plus_one_benefit": 0.1, "import_dependency": 0.2},
+      "policy_risk": {"regulatory_sensitivity": 0.4, "govt_scheme_dependency": 0.8, "rate_sensitivity": 0.4},
+      "commodity_risk": {"crude_sensitivity": 0.3, "raw_material_import": 0.3},
+      "event_risk": {"monsoon_sensitivity": 0.2, "election_sensitivity": 0.4}
     },
     "Real Estate": {
       "trade_risk": {"export_sensitivity": 0.1, "china_plus_one_benefit": 0.1, "import_dependency": 0.3},

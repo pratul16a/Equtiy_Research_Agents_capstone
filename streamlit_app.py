@@ -2068,6 +2068,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
             from app.ui.usp_cards import (
                 render_usp_heatmap, render_usp_card, render_usp_radar,
                 render_contradiction_alerts, transform_usp_data,
+                render_portfolio_insights,
             )
 
             usp_cards = cdata.get("usp_cards", {})
@@ -2087,10 +2088,18 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     usp_cards,
                 )
 
+                # Portfolio-level insights (cross-stock comparison)
+                usp_raw = cdata.get("usp_scores", {})
+                portfolio_data = usp_raw.get("_portfolio_insights", {})
+                if portfolio_data:
+                    render_portfolio_insights(portfolio_data.get("text", ""))
+
                 st.markdown("### Per-Stock USP Analysis")
-                for tkr in sorted(usp_cards.keys(),
-                                  key=lambda t: usp_cards[t].get("_composite", 0),
-                                  reverse=True):
+                for tkr in sorted(
+                    [t for t in usp_cards.keys() if not t.startswith("_")],
+                    key=lambda t: usp_cards[t].get("_composite", 0),
+                    reverse=True,
+                ):
                     c1, c2 = st.columns([2, 1])
                     with c1:
                         render_usp_card(tkr, usp_cards[tkr])

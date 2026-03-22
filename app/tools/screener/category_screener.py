@@ -800,7 +800,38 @@ def apply_usp_layer(
             per_stock[ticker][module_name] = stock
 
     if progress_cb:
-        progress_cb(1.0, f"USP: Scored {len(per_stock)} stocks across 5 dimensions")
+        progress_cb(0.85, f"USP: Scored {len(per_stock)} stocks across 5 dimensions")
+
+    # ── LLM Commentary Layer ──────────────────────────────────
+    try:
+        from app.tools.screener.usp_commentary import (
+            generate_usp_commentary,
+            generate_portfolio_insights,
+        )
+
+        if progress_cb:
+            progress_cb(0.86, f"USP: Generating LLM commentary for {len(per_stock)} stocks...")
+
+        commentary = generate_usp_commentary(
+            per_stock, bulk_info,
+            progress_cb=lambda f, m: progress_cb(0.86 + f * 0.10, m) if progress_cb else None,
+        )
+        for ticker, comm in commentary.items():
+            if ticker in per_stock:
+                per_stock[ticker]["_commentary"] = comm
+
+        if progress_cb:
+            progress_cb(0.97, "USP: Generating portfolio insights...")
+
+        portfolio_insights = generate_portfolio_insights(per_stock)
+        if portfolio_insights:
+            per_stock["_portfolio_insights"] = {"text": portfolio_insights}
+
+    except Exception as e:
+        logger.warning("USP commentary generation failed (non-fatal): %s", e)
+
+    if progress_cb:
+        progress_cb(1.0, f"USP: Complete — {len(per_stock)} stocks scored with commentary")
 
     return per_stock
 

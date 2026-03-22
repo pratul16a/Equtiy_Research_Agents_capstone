@@ -49,6 +49,24 @@
     "keywords": ["renewable energy", "solar policy", "green hydrogen", "wind energy", "PLI solar"],
     "impact": "high"
   },
+  "NEP_Power": {
+    "tailwind_sectors": ["Utilities"],
+    "tailwind_tickers": ["NTPC.NS", "POWERGRID.NS", "TATAPOWER.NS", "TORNTPOWER.NS", "CESC.NS", "JSW.NS", "NHPC.NS"],
+    "keywords": ["National Electricity Policy", "power sector reform", "electricity amendment", "power distribution"],
+    "impact": "high"
+  },
+  "Green_Hydrogen": {
+    "tailwind_sectors": ["Utilities", "Energy"],
+    "tailwind_tickers": ["NTPC.NS", "RELIANCE.NS", "ADANIGREEN.NS", "IOC.NS", "GAIL.NS"],
+    "keywords": ["green hydrogen mission", "hydrogen policy", "National Green Hydrogen Mission", "electrolyser"],
+    "impact": "medium"
+  },
+  "PLI_Solar": {
+    "tailwind_sectors": ["Utilities"],
+    "tailwind_tickers": ["TATAPOWER.NS", "ADANIGREEN.NS", "WAAREEENER.NS"],
+    "keywords": ["PLI solar", "solar module manufacturing", "solar cell PLI", "domestic solar"],
+    "impact": "high"
+  },
   "RBI_Rate_Policy": {
     "tailwind_sectors": ["Financial Services"],
     "headwind_sectors": ["Real Estate"],

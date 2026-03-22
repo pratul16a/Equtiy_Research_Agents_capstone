@@ -140,6 +140,10 @@ def _compute_institutional_flow(ticker: str, info: dict) -> tuple[float, dict]:
 
     # 1. Current institutional holding level
     inst_pct = _safe_float(info.get("heldPercentInstitutions"))
+    if inst_pct is None:
+        from app.tools.screener.ownership_screens import _get_screener_shareholding
+        screener = _get_screener_shareholding(ticker)
+        inst_pct = screener.get("institutional_pct")
     if inst_pct is not None:
         signals["institutional_pct"] = round(inst_pct * 100, 2)
         # Higher institutional holding = higher flow score (less opportunity for lag)

@@ -37,6 +37,10 @@ def screen_low_pledge(
         try:
             insider_pct = _safe_float(info.get("heldPercentInsiders"))
             if insider_pct is None:
+                from app.tools.screener.ownership_screens import _get_screener_shareholding
+                screener = _get_screener_shareholding(ticker)
+                insider_pct = screener.get("promoter_pct")
+            if insider_pct is None:
                 continue
 
             # In Indian context, heldPercentInsiders approximates promoter holding
@@ -77,6 +81,10 @@ def screen_increasing_institutional(
                 continue
 
             inst_pct = _safe_float(info.get("heldPercentInstitutions"))
+            if inst_pct is None:
+                from app.tools.screener.ownership_screens import _get_screener_shareholding
+                screener = _get_screener_shareholding(ticker)
+                inst_pct = screener.get("institutional_pct")
             if inst_pct is None:
                 continue
 

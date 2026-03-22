@@ -155,8 +155,12 @@ def screen_promoter_anomalies(
                 anomaly_score -= 15
                 flags.append(f"High RPT frequency ({rpt['rpt_count']} filings)")
 
-            # High promoter holding from info
+            # High promoter holding from info (with Screener.in fallback)
             insider_pct = _safe_float(info.get("heldPercentInsiders"))
+            if insider_pct is None:
+                from app.tools.screener.ownership_screens import _get_screener_shareholding
+                screener = _get_screener_shareholding(ticker)
+                insider_pct = screener.get("promoter_pct")
             if insider_pct is not None and insider_pct > 0.60:
                 anomaly_score += 10
                 flags.append(f"High promoter holding ({insider_pct*100:.0f}%)")
