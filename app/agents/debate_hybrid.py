@@ -20,6 +20,7 @@ from app.rag.retriever import search_by_symbol
 logger = logging.getLogger(__name__)
 
 DEBATE_MODEL = "openai/gpt-4o"
+DEBATE_FALLBACK_MODEL = "google/gemini-2.0-flash-001"
 
 
 def _get_rag_snippets(symbol: str, query: str, k: int = 5) -> list[str]:
@@ -228,26 +229,33 @@ Respond with ONLY a JSON object (no markdown fences):
     "bear_strength": <1-10>
 }}"""
 
-    try:
-        llm = get_llm(temperature=0.2, model=DEBATE_MODEL)
+    def _invoke_hybrid_judge(model_name: str) -> dict:
+        llm = get_llm(temperature=0.2, model=model_name)
         response = llm.invoke(prompt)
         content = response.content.strip().strip("```json").strip("```").strip()
-        verdict = json.loads(content)
-
+        result = json.loads(content)
         required = ["conviction_score", "recommendation", "reasoning"]
         for field in required:
-            if field not in verdict:
-                verdict[field] = "Error: missing field"
+            if field not in result:
+                result[field] = "Error: missing field"
+        return result
+
+    try:
+        verdict = _invoke_hybrid_judge(DEBATE_MODEL)
     except Exception as e:
-        logger.error("Hybrid Judge failed for %s: %s", ticker, e)
-        verdict = {
-            "conviction_score": 5,
-            "recommendation": "HOLD",
-            "reasoning": f"Judge error: {e}",
-            "key_factors": [],
-            "bull_strength": 5,
-            "bear_strength": 5,
-        }
+        logger.warning("Hybrid Judge primary failed for %s: %s — trying fallback", ticker, e)
+        try:
+            verdict = _invoke_hybrid_judge(DEBATE_FALLBACK_MODEL)
+        except Exception as e2:
+            logger.error("Hybrid Judge fallback also failed for %s: %s", ticker, e2)
+            verdict = {
+                "conviction_score": 5,
+                "recommendation": "HOLD",
+                "reasoning": f"Judge error: {e}",
+                "key_factors": [],
+                "bull_strength": 5,
+                "bear_strength": 5,
+            }
 
     return {
         "ticker": ticker,

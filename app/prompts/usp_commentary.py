@@ -6,28 +6,26 @@ import json
 from typing import Any
 
 
-USP_COMMENTARY_SYSTEM = """You are a senior equity research analyst at a top Indian brokerage.
-Your job: translate raw USP indicator scores into actionable investment commentary.
+USP_COMMENTARY_SYSTEM = """You are a senior equity research analyst at a top Indian brokerage (IIFL, Motilal Oswal, Kotak Institutional).
+Your job: translate raw USP indicator scores into a rich, actionable investment note.
 
 Rules:
-- Every sentence MUST reference a specific number from the data provided.
-- Sentence 1: What the score means for THIS company specifically.
-- Sentence 2: Why an investor should care (investment implication).
-- Sentence 3 (optional): Key risk or catalyst to watch.
-- No generic language. "Strong fundamentals" is banned. Use "ROE improved 5pp to 18%" instead.
-- Keep each dimension to 2-3 sentences max. Be dense, not verbose.
-- Use Indian market context (Nifty, SEBI, PLI, FII/DII, promoter holding norms)."""
+- Every claim MUST reference a specific number from the data provided.
+- Use Indian market context: Nifty, SEBI, PLI, FII/DII flows, promoter holding norms, RBI policy, monsoon impact.
+- Write like a research note, not a textbook. Be opinionated but evidence-based.
+- "Strong fundamentals" is BANNED. Use "ROE improved 5pp to 18%, above sector median of 14%" instead.
+- Reference recent news headlines when provided — connect USP scores to real-world events.
+- Be specific about sector dynamics (e.g., "PLI tailwind for electronics" not "government support").
+- Use concrete comparisons: "promoter holding at 62% vs sector avg 45%" not "high promoter holding"."""
 
 
-USP_COMMENTARY_TEMPLATE = """Analyze the USP scores for {ticker} ({sector} sector) and write 2-3 sentence investment commentary for each dimension.
+USP_RICH_COMMENTARY_TEMPLATE = """Write a rich investment analyst note for {ticker} ({sector} sector).
 
 ## Raw USP Data:
 
 ### 1. Geopolitical Risk (Score: {geo_score}/100 — {geo_level})
-- Trade Risk: {trade_risk}/100
-- Policy Risk: {policy_risk}/100
-- Commodity Risk: {commodity_risk}/100
-- Event Risk: {event_risk}/100
+- Trade Risk: {trade_risk}/100 | Policy Risk: {policy_risk}/100
+- Commodity Risk: {commodity_risk}/100 | Event Risk: {event_risk}/100
 - Risk Level: {risk_level}
 
 ### 2. Smart Money Lag (Score: {sm_score}/100 — {sm_level})
@@ -48,40 +46,63 @@ USP_COMMENTARY_TEMPLATE = """Analyze the USP scores for {ticker} ({sector} secto
 ### 5. Promoter Behavior (Score: {promoter_score}/100 — {promoter_level})
 {promoter_details}
 
-## Output Format (respond in EXACTLY this JSON format):
+{recent_news_section}
+
+## Output Format — respond in EXACTLY this JSON:
 {{
-  "geopolitical": "2-3 sentence commentary...",
-  "smart_money": "2-3 sentence commentary...",
-  "regulatory": "2-3 sentence commentary...",
-  "mgmt_credibility": "2-3 sentence commentary...",
-  "promoter": "2-3 sentence commentary..."
+  "investment_thesis": "A 3-4 sentence synthesis connecting ALL 5 USP dimensions into one cohesive investment narrative. What story do these scores tell together? End with a clear directional view (accumulate/hold/avoid).",
+  "key_catalysts": ["Catalyst 1 with specific data point", "Catalyst 2 with specific data point", "Catalyst 3 with specific data point"],
+  "key_risks": ["Risk 1 with specific score reference", "Risk 2 with specific score reference"],
+  "what_to_watch": "One specific, actionable trigger the investor should monitor — e.g., 'Watch for FII holding crossing 15% in next quarter shareholding data' or 'Monitor if PLI disbursement timeline holds per MeitY notification'",
+  "dimension_notes": {{
+    "geopolitical": "2-3 sentences: what THIS geo score means for THIS company specifically",
+    "smart_money": "2-3 sentences: interpret the lag score — is this an opportunity or a warning?",
+    "regulatory": "2-3 sentences: which specific policies matter and their likely timeline/impact",
+    "mgmt_credibility": "2-3 sentences: what the credibility assessment implies for execution risk",
+    "promoter": "2-3 sentences: what promoter behavior signals about insider conviction"
+  }}
 }}"""
 
 
 PORTFOLIO_INSIGHTS_SYSTEM = """You are a senior portfolio strategist at a top Indian brokerage.
 You analyze collections of stocks that passed a screener and provide portfolio-level insights.
-Be specific — use stock names, exact scores, and concrete comparisons. No generic statements."""
+Be specific — use stock names, exact scores, and concrete comparisons. No generic statements.
+Write with conviction — this is a strategy note for the desk, not a compliance document."""
 
 
-PORTFOLIO_INSIGHTS_TEMPLATE = """Given these USP profiles for {count} {category} stocks, provide 4 concise insights:
+PORTFOLIO_INSIGHTS_TEMPLATE = """Given these USP profiles for {count} {category} stocks, provide portfolio-level analysis.
 
 ## Stock USP Profiles:
 {stock_profiles}
 
-## Respond in EXACTLY this format:
-1. **Strongest Risk-Adjusted Profile:** [Which stock and why — cite specific scores]
-2. **Best Smart Money Opportunity:** [Which stock has the biggest gap between improving fundamentals and low institutional positioning — cite the lag score and key metrics]
-3. **Diversification Pairs:** [Which 2 stocks pair well together based on contrasting USP strengths — e.g., one strong on geopolitical, other strong on promoter conviction]
-4. **Risk Flag:** [Which stock's USP profile contradicts its screener pass — cite the specific weak dimension and score]"""
+## Respond in EXACTLY this markdown format:
+
+### Strongest Risk-Adjusted Profile
+[Which stock has the best overall USP profile and why — cite at least 3 specific dimension scores. Compare it to the weakest profile in the set.]
+
+### Best Smart Money Opportunity
+[Which stock has the biggest gap between improving fundamentals and low institutional positioning? Cite the lag score, key fundamental metrics, and current institutional holding. Explain why institutions haven't caught on yet.]
+
+### Portfolio Construction
+[How should an investor weight these stocks? Which 2-3 stocks pair well for diversification based on contrasting USP strengths? Which stocks have correlated risks that shouldn't be over-concentrated?]
+
+### Risk Flag
+[Which stock's USP profile most contradicts its screener pass? Cite the specific weak dimension, score, and what could go wrong. Be direct — "TICKER should be on a shorter leash because..."]"""
 
 
-def build_stock_commentary_prompt(ticker: str, usp_data: dict[str, Any], sector: str = "Unknown") -> tuple[str, str]:
+def build_stock_commentary_prompt(
+    ticker: str,
+    usp_data: dict[str, Any],
+    sector: str = "Unknown",
+    recent_news: list[str] | None = None,
+) -> tuple[str, str]:
     """Build system + user prompt for per-stock USP commentary.
 
     Args:
         ticker: Stock ticker (e.g., TORNTPHARM.NS)
         usp_data: {module_name: raw_data} from apply_usp_layer()
         sector: Stock sector
+        recent_news: Optional list of recent news headlines for context
 
     Returns:
         (system_prompt, user_prompt)
@@ -118,9 +139,16 @@ def build_stock_commentary_prompt(ticker: str, usp_data: dict[str, Any], sector:
     if "rpt_count" in prom:
         prom_parts.append(f"- Related Party Txns: {prom['rpt_count']}")
 
+    # Recent news section
+    news_section = ""
+    if recent_news:
+        news_lines = "\n".join(f"- {h}" for h in recent_news[:8])
+        news_section = f"""### Recent News Headlines (for context — connect scores to real events):
+{news_lines}"""
+
     from app.ui.usp_cards import _score_level
 
-    user_prompt = USP_COMMENTARY_TEMPLATE.format(
+    user_prompt = USP_RICH_COMMENTARY_TEMPLATE.format(
         ticker=ticker,
         sector=sector,
         geo_score=geo.get("geo_score", "N/A"),
@@ -136,8 +164,8 @@ def build_stock_commentary_prompt(ticker: str, usp_data: dict[str, Any], sector:
         institutional_flow=round(sm.get("institutional_flow", 0)),
         smart_money_lag=round(sm.get("smart_money_lag", 0), 1),
         sm_details="\n".join(sm_parts) if sm_parts else "- No detailed metrics available",
-        reg_score=reg.get("regulatory_score", "N/A"),
-        reg_level=_score_level(reg.get("regulatory_score", 50), "regulatory"),
+        reg_score=reg.get("regulatory_score", reg.get("reg_score", "N/A")),
+        reg_level=_score_level(reg.get("regulatory_score", reg.get("reg_score", 50)), "regulatory"),
         reg_signal=reg.get("net_signal", "Unknown"),
         tailwind_policies=", ".join(reg.get("tailwind_policies", [])) or "None",
         headwind_policies=", ".join(reg.get("headwind_policies", [])) or "None",
@@ -148,6 +176,7 @@ def build_stock_commentary_prompt(ticker: str, usp_data: dict[str, Any], sector:
         promoter_score=prom.get("promoter_score", "N/A"),
         promoter_level=_score_level(prom.get("promoter_score", 50), "promoter"),
         promoter_details="\n".join(prom_parts) if prom_parts else "- No promoter data available",
+        recent_news_section=news_section,
     )
 
     return USP_COMMENTARY_SYSTEM, user_prompt
@@ -170,6 +199,8 @@ def build_portfolio_insights_prompt(
 
     profiles = []
     for ticker, modules in sorted(per_stock_usp.items()):
+        if ticker.startswith("_"):
+            continue
         geo = modules.get("geopolitical", {})
         sm = modules.get("smart_money", {})
         reg = modules.get("regulatory", {})
@@ -185,14 +216,14 @@ def build_portfolio_insights_prompt(
             f"Geo={geo.get('geo_score', 'N/A')}, "
             f"SmartMoney={sm_score} (lag={sm.get('smart_money_lag', 0):.0f}, "
             f"inst={flow.get('institutional_pct', 0):.1f}%), "
-            f"Regulatory={reg.get('regulatory_score', 'N/A')}, "
+            f"Regulatory={reg.get('regulatory_score', reg.get('reg_score', 'N/A'))}, "
             f"Mgmt={mgmt.get('credibility_score', 'N/A')}, "
             f"Promoter={prom.get('promoter_score', 'N/A')}"
         )
         profiles.append(profile)
 
     user_prompt = PORTFOLIO_INSIGHTS_TEMPLATE.format(
-        count=len(per_stock_usp),
+        count=len(profiles),
         category=category,
         stock_profiles="\n".join(profiles),
     )

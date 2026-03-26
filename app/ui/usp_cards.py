@@ -1,10 +1,12 @@
 """USP Card Renderer — transforms raw USP module output into Streamlit UI components.
 
-Provides 4 rendering functions:
+Provides rendering functions:
 1. render_usp_heatmap() — compact colored table for quick comparison
 2. render_usp_card() — expandable per-stock card with factor-by-factor evidence
 3. render_usp_radar() — Plotly radar chart with peer overlay
-4. render_contradiction_alerts() — red banners for category/USP conflicts
+4. render_analyst_panel() — rich right-side panel with thesis, catalysts, risks
+5. render_contradiction_alerts() — red banners for category/USP conflicts
+6. render_portfolio_insights() — cross-stock strategy note
 """
 
 from __future__ import annotations
@@ -81,7 +83,7 @@ def _transform_smart_money(data: dict) -> dict[str, Any]:
     lag = data.get("smart_money_lag", 0)
     imp = data.get("fundamental_improvement", 50)
     flow = data.get("institutional_flow", 50)
-    score = min(100, max(0, 50 + lag))  # lag centered at 0, convert to 0-100
+    score = min(100, max(0, 50 + lag))
 
     imp_details = data.get("improvement_details", {})
     flow_details = data.get("flow_details", {})
@@ -100,7 +102,6 @@ def _transform_smart_money(data: dict) -> dict[str, Any]:
         val = flow_details["institutional_pct"]
         factors.append({"name": "Institutional Holding", "value": f"{val:.1f}%", "status": "neutral"})
 
-    # Determine gap interpretation
     if lag > 20:
         interpretation = "Fundamentals improving but institutions haven't caught up — early opportunity"
     elif lag > 0:
@@ -222,19 +223,11 @@ _TRANSFORMERS = {
 
 
 def transform_usp_data(usp_raw: dict[str, dict]) -> dict[str, dict[str, Any]]:
-    """Transform raw USP module output into structured card data.
-
-    Args:
-        usp_raw: {ticker: {module_name: raw_data}} from apply_usp_layer()
-
-    Returns:
-        {ticker: {module_name: transformed_card_data}}
-    """
+    """Transform raw USP module output into structured card data."""
     result: dict[str, dict[str, Any]] = {}
 
     for ticker, modules in usp_raw.items():
         if ticker.startswith("_"):
-            # Preserve meta keys like _portfolio_insights
             result[ticker] = modules
             continue
 
@@ -243,7 +236,6 @@ def transform_usp_data(usp_raw: dict[str, dict]) -> dict[str, dict[str, Any]]:
 
         for module_name, raw_data in modules.items():
             if module_name.startswith("_"):
-                # Preserve _commentary and other meta keys
                 result[ticker][module_name] = raw_data
                 continue
             transformer = _TRANSFORMERS.get(module_name)
@@ -252,7 +244,6 @@ def transform_usp_data(usp_raw: dict[str, dict]) -> dict[str, dict[str, Any]]:
                 result[ticker][module_name] = card
                 composite_scores.append(card["score"])
 
-        # Compute composite score
         if composite_scores:
             result[ticker]["_composite"] = round(sum(composite_scores) / len(composite_scores))
         else:
@@ -271,20 +262,19 @@ def render_usp_heatmap(usp_cards: dict[str, dict[str, Any]]) -> None:
         return
 
     dimensions = ["geopolitical", "smart_money", "regulatory", "mgmt_credibility", "promoter"]
-    dim_labels = {"geopolitical": "Geo", "smart_money": "Smart$", "regulatory": "Regulatory", "mgmt_credibility": "Mgmt", "promoter": "Promoter"}
+    dim_labels = {"geopolitical": "Geo", "smart_money": "Smart$", "regulatory": "Reg", "mgmt_credibility": "Mgmt", "promoter": "Promoter"}
 
-    # Build table data
     rows = []
     for ticker, modules in sorted(usp_cards.items(), key=lambda x: x[1].get("_composite", 0) if isinstance(x[1], dict) else 0, reverse=True):
         if ticker.startswith("_"):
             continue
-        row = {"Stock": ticker}
+        row = {"Stock": ticker.replace(".NS", "")}
         for dim in dimensions:
             card = modules.get(dim, {})
             score = card.get("score", "-")
             emoji = card.get("emoji", "⚪")
             row[dim_labels[dim]] = f"{emoji} {score}" if isinstance(score, (int, float)) else "⚪ -"
-        row["Composite"] = modules.get("_composite", 0)
+        row["Avg"] = modules.get("_composite", 0)
         rows.append(row)
 
     if rows:
@@ -294,11 +284,11 @@ def render_usp_heatmap(usp_cards: dict[str, dict[str, Any]]) -> None:
 
 
 def render_usp_card(ticker: str, usp_data: dict[str, Any]) -> None:
-    """Render an expandable USP card for a single stock."""
+    """Render the LEFT side: compact USP scores + factors for a single stock."""
     composite = usp_data.get("_composite", 0)
     emoji = _score_emoji(composite)
 
-    with st.expander(f"{emoji} {ticker} — Composite USP Score: {composite}/100", expanded=False):
+    with st.expander(f"{emoji} {ticker.replace('.NS', '')} — USP Score: {composite}/100", expanded=False):
         dimensions = ["geopolitical", "smart_money", "regulatory", "mgmt_credibility", "promoter"]
         dim_titles = {
             "geopolitical": "Geopolitical Risk",
@@ -308,6 +298,15 @@ def render_usp_card(ticker: str, usp_data: dict[str, Any]) -> None:
             "promoter": "Promoter Behavior",
         }
 
+        # Get dimension notes from commentary
+        commentary = usp_data.get("_commentary", {})
+        dim_notes = commentary.get("dimension_notes", {})
+        # Backward compat: if no dimension_notes, check top-level keys
+        if not dim_notes:
+            for dim in dimensions:
+                if dim in commentary and isinstance(commentary[dim], str):
+                    dim_notes[dim] = commentary[dim]
+
         for dim in dimensions:
             card = usp_data.get(dim)
             if not card:
@@ -316,34 +315,108 @@ def render_usp_card(ticker: str, usp_data: dict[str, Any]) -> None:
 
             score = card.get("score", 0)
             level = card.get("level", "")
+            color = card.get("color", "#8892A0")
             emoji_dim = card.get("emoji", "⚪")
 
-            st.markdown(f"### {dim_titles[dim]}")
-            st.markdown(f"**{emoji_dim} {score}/100 — {level}**")
+            # Compact header with colored score badge
+            st.markdown(
+                f'<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">'
+                f'<span style="font-weight:600; font-size:0.95em;">{dim_titles[dim]}</span>'
+                f'<span style="background:{color}; color:#0E1117; padding:2px 8px; border-radius:10px; '
+                f'font-size:0.8em; font-weight:700;">{score}/100</span>'
+                f'<span style="color:{color}; font-size:0.8em;">{level}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
-            # Render factors
+            # Render factors as compact pills
             for factor in card.get("factors", []):
                 status = factor.get("status", "neutral")
                 icon = "✅" if status == "positive" else "🔴" if status in ("negative", "headwind") else "🟢" if status == "tailwind" else "🟡"
                 st.markdown(f"- {icon} **{factor['name']}:** {factor['value']}")
 
-            # Summary
-            summary = card.get("summary", "")
-            if summary:
-                st.caption(summary)
-
-            # LLM Commentary (if available)
-            commentary = usp_data.get("_commentary", {})
-            if dim in commentary:
+            # Dimension-level LLM note (if available)
+            note = dim_notes.get(dim)
+            if note:
                 st.markdown(
-                    f'<div style="background: #1a1f2e; border-left: 3px solid #00D4AA; '
-                    f'padding: 10px 14px; border-radius: 4px; margin: 8px 0; '
-                    f'font-size: 0.9em; color: #E0E0E0;">'
-                    f'{commentary[dim]}</div>',
+                    f'<div style="background:#1a1f2e; border-left:3px solid {color}; '
+                    f'padding:8px 12px; border-radius:4px; margin:6px 0; '
+                    f'font-size:0.85em; color:#C0C0C0; line-height:1.5;">'
+                    f'{note}</div>',
                     unsafe_allow_html=True,
                 )
 
             st.divider()
+
+
+def render_analyst_panel(ticker: str, usp_data: dict[str, Any]) -> None:
+    """Render the RIGHT side: rich Analyst View panel with thesis, catalysts, risks.
+
+    This uses the full real estate below the radar chart.
+    """
+    commentary = usp_data.get("_commentary", {})
+    if not commentary or "_raw" in commentary:
+        return
+
+    # ── Investment Thesis ──
+    thesis = commentary.get("investment_thesis")
+    if thesis:
+        st.markdown(
+            f'<div style="background:linear-gradient(135deg, #1a2332 0%, #0E1117 100%); '
+            f'border:1px solid #00D4AA; border-radius:8px; padding:14px 16px; margin-bottom:12px;">'
+            f'<div style="color:#00D4AA; font-size:0.75em; font-weight:700; '
+            f'text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Investment Thesis</div>'
+            f'<div style="color:#E8E8E8; font-size:0.9em; line-height:1.6;">{thesis}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Key Catalysts ──
+    catalysts = commentary.get("key_catalysts", [])
+    if catalysts:
+        catalyst_html = "".join(
+            f'<div style="display:flex; gap:8px; margin-bottom:6px;">'
+            f'<span style="color:#00D4AA; font-size:0.85em;">▲</span>'
+            f'<span style="color:#D0D0D0; font-size:0.85em;">{c}</span></div>'
+            for c in catalysts
+        )
+        st.markdown(
+            f'<div style="background:#111820; border-radius:6px; padding:10px 14px; margin-bottom:10px;">'
+            f'<div style="color:#00D4AA; font-size:0.72em; font-weight:700; '
+            f'text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Key Catalysts</div>'
+            f'{catalyst_html}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Key Risks ──
+    risks = commentary.get("key_risks", [])
+    if risks:
+        risk_html = "".join(
+            f'<div style="display:flex; gap:8px; margin-bottom:6px;">'
+            f'<span style="color:#FF4757; font-size:0.85em;">▼</span>'
+            f'<span style="color:#D0D0D0; font-size:0.85em;">{r}</span></div>'
+            for r in risks
+        )
+        st.markdown(
+            f'<div style="background:#111820; border-radius:6px; padding:10px 14px; margin-bottom:10px;">'
+            f'<div style="color:#FF4757; font-size:0.72em; font-weight:700; '
+            f'text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Key Risks</div>'
+            f'{risk_html}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── What to Watch ──
+    watch = commentary.get("what_to_watch")
+    if watch:
+        st.markdown(
+            f'<div style="background:#1a1a2e; border:1px solid #B388FF; border-radius:6px; '
+            f'padding:10px 14px; margin-bottom:10px;">'
+            f'<div style="color:#B388FF; font-size:0.72em; font-weight:700; '
+            f'text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">What to Watch</div>'
+            f'<div style="color:#D0D0D0; font-size:0.85em; line-height:1.5;">👁 {watch}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_usp_radar(ticker: str, usp_data: dict[str, Any], category_avg: dict[str, float] | None = None) -> None:
@@ -357,24 +430,21 @@ def render_usp_radar(ticker: str, usp_data: dict[str, Any], category_avg: dict[s
     dimensions = ["geopolitical", "smart_money", "regulatory", "mgmt_credibility", "promoter"]
     labels = ["Geopolitical", "Smart Money", "Regulatory", "Management", "Promoter"]
 
-    # Stock values
     values = [usp_data.get(dim, {}).get("score", 0) for dim in dimensions]
-    values.append(values[0])  # close the polygon
+    values.append(values[0])
     labels_closed = labels + [labels[0]]
 
     fig = go.Figure()
 
-    # Stock line (solid)
     fig.add_trace(go.Scatterpolar(
         r=values,
         theta=labels_closed,
         fill="toself",
         fillcolor="rgba(0, 212, 170, 0.15)",
         line=dict(color="#00D4AA", width=2),
-        name=ticker,
+        name=ticker.replace(".NS", ""),
     ))
 
-    # Category average (dotted overlay)
     if category_avg:
         avg_values = [category_avg.get(dim, 50) for dim in dimensions]
         avg_values.append(avg_values[0])
@@ -395,11 +465,11 @@ def render_usp_radar(ticker: str, usp_data: dict[str, Any], category_avg: dict[s
             radialaxis=dict(visible=True, range=[0, 100], gridcolor="#2D3748", color="#8892A0"),
             angularaxis=dict(gridcolor="#2D3748", color="#E0E0E0"),
         ),
-        font=dict(color="#E0E0E0"),
+        font=dict(color="#E0E0E0", size=10),
         showlegend=True,
-        height=350,
-        margin=dict(l=40, r=40, t=30, b=30),
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#8892A0")),
+        height=280,
+        margin=dict(l=30, r=30, t=20, b=20),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#8892A0", size=9)),
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -420,21 +490,18 @@ def render_contradiction_alerts(
 
             usp = usp_cards[ticker]
 
-            # Momentum stock with bad promoter score
             if cat_name == "B" and usp.get("promoter", {}).get("score", 100) < 35:
                 alerts.append(
                     f"**{ticker}** passed Cat B (Momentum) but Promoter Score "
                     f"{usp['promoter']['score']}/100 — governance concern. Debate agents will address this."
                 )
 
-            # Value stock with bad management credibility
             if cat_name == "C" and usp.get("mgmt_credibility", {}).get("score", 100) < 30:
                 alerts.append(
                     f"**{ticker}** passed Cat C (Value Bottoms) but Management Credibility "
                     f"{usp['mgmt_credibility']['score']}/100 — turnaround may not materialize."
                 )
 
-            # Any stock with very high geopolitical risk
             if usp.get("geopolitical", {}).get("score", 100) < 25:
                 alerts.append(
                     f"**{ticker}** has Geopolitical Risk Score {usp['geopolitical']['score']}/100 — "
@@ -451,11 +518,11 @@ def render_portfolio_insights(insights_text: str) -> None:
     if not insights_text:
         return
 
-    st.markdown("### Portfolio-Level USP Insights")
+    st.markdown("### Portfolio Strategy Note")
     st.markdown(
-        f'<div style="background: linear-gradient(135deg, #1a1f2e 0%, #0E1117 100%); '
-        f'border: 1px solid #00D4AA; border-radius: 8px; padding: 16px 20px; '
-        f'margin-bottom: 16px;">'
+        f'<div style="background:linear-gradient(135deg, #1a1f2e 0%, #0E1117 100%); '
+        f'border:1px solid #00D4AA; border-radius:8px; padding:18px 22px; '
+        f'margin-bottom:16px; line-height:1.7; color:#E0E0E0;">'
         f'{insights_text}</div>',
         unsafe_allow_html=True,
     )

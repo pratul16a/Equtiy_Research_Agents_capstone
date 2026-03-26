@@ -2,11 +2,14 @@
 
 Converts a StockProfile into a structured text block for LLM context injection,
 then handles conversational Q&A with full stock data available.
+
+v2: Question-aware context filtering + tiered response lengths.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import pandas as pd
@@ -17,59 +20,99 @@ from app.scoring import format_score_for_prompt
 
 logger = logging.getLogger(__name__)
 
-DEEP_DIVE_SYSTEM_PROMPT = """You are an expert Indian equity research analyst (CFA, 15+ years experience) with deep knowledge of {company_name} ({ticker}).
+# ---------------------------------------------------------------------------
+# Question classification
+# ---------------------------------------------------------------------------
 
-You have access to comprehensive stock data below. Use it to provide DETAILED, THOROUGH analysis. Think like a sell-side analyst writing a research note — be exhaustive, not superficial.
+_THESIS_PATTERNS = re.compile(
+    r"\b(should i buy|should i sell|should i hold|investment thesis|bull case|bear case|"
+    r"outlook|recommendation|target price|worth buying|accumulate|avoid)\b", re.I
+)
+_ANALYSIS_PATTERNS = re.compile(
+    r"\b(why|how has|compare|trend|risk|red flag|competitor|moat|growth driver|"
+    r"margin pressure|debt concern|peer|valuation expensive|undervalued|overvalued|"
+    r"what are the risks|what are the strengths|weakness|opportunity|threat|swot|"
+    r"explain|analyze|analysis|assess|evaluate|implications|impact|concern)\b", re.I
+)
 
-## RESPONSE RULES — FOLLOW STRICTLY
 
-1. **Always cite specific numbers**: Don't say "revenue grew" — say "Revenue grew 18.2% YoY from ₹1,42,300 Cr to ₹1,68,100 Cr". Pull exact figures from the financial data.
+def classify_question(question: str) -> str:
+    """Classify a user question into 'factual', 'analysis', or 'thesis'.
 
-2. **Use Indian financial notation**: Crores (Cr), Lakhs (L). Format large numbers as ₹X,XXX Cr.
+    Priority: thesis > analysis > factual (avoids misclassifying
+    "what are the risks?" as factual).
+    """
+    if _THESIS_PATTERNS.search(question):
+        return "thesis"
+    if _ANALYSIS_PATTERNS.search(question):
+        return "analysis"
+    return "factual"
 
-3. **Structure every answer with clear sections**: Use markdown headings (##, ###), bullet points, and tables where appropriate.
 
-4. **Provide multi-dimensional analysis**: For every topic, cover:
-   - Current state (with numbers)
-   - Historical trend (YoY or QoQ changes from the financial data)
-   - Peer/industry comparison (from peer data if available)
-   - Forward outlook / implications
-   - Key risks to the thesis
+# ---------------------------------------------------------------------------
+# System prompts — one per question type
+# ---------------------------------------------------------------------------
 
-5. **For product/segment questions**:
-   - Use the business description to identify all segments/verticals
-   - Cross-reference revenue and operating income trends to infer segment performance
-   - If exact segment breakdown isn't available, clearly state so but provide analysis using total revenue, margin trends, and sector knowledge
-   - Mention market share where known
+_BASE_RULES = """You are an expert Indian equity research analyst with deep knowledge of {company_name} ({ticker}).
 
-6. **For competitor/moat questions**:
-   - Use peer comparison data for direct metrics comparison (P/E, margins, growth)
-   - Analyze competitive advantages: brand, scale, cost leadership, network effects, switching costs, regulatory barriers
-   - Discuss market positioning and market share dynamics
+## Rules
+- Always cite specific numbers from the data (e.g. "Revenue grew 18.2% YoY from 1,42,300 Cr to 1,68,100 Cr").
+- Use Indian financial notation: Crores (Cr), Lakhs (L). Format as INR X,XXX Cr.
+- If data is missing, say "Data not available" explicitly.
+- Do NOT repeat information already given in earlier messages.
+- Be balanced but decisive — give your weighted view, don't sit on the fence."""
 
-7. **For risk/red flag questions**:
-   - Cross-reference ALL risk signals: governance score, promoter pledge %, related party transactions, debt/equity ratio, geopolitical exposure, regulatory headwinds, smart money lag
-   - Rate severity: Critical / Moderate / Low for each risk
-   - Mention both financial AND non-financial risks (regulatory, ESG, key-man, concentration)
+FACTUAL_PROMPT = _BASE_RULES + """
 
-8. **For valuation questions**:
-   - Use DCF intrinsic value, current multiples (P/E, P/B, EV/EBITDA), and peer multiples
-   - Show upside/downside math
-   - Discuss what assumptions would need to change for a different outcome
+## Response style
+Answer in **1-3 sentences**. Cite the exact number(s) the user is asking about. No multi-section analysis, no headings, no bullet lists unless the user asks for a list.
 
-9. **For financial analysis**:
-   - Show multi-year trends (compute YoY growth rates from the data)
-   - Highlight inflection points or concerning patterns
-   - Compare margins and ratios to industry averages where possible
-   - Comment on cash flow quality vs. reported earnings
-
-10. **Be balanced but decisive**: Present bull AND bear cases, but end with your weighted view based on the data. Don't sit on the fence.
-
-11. **Length**: Provide comprehensive answers. A good answer is typically 400-800 words with specific data points. Don't be brief — the user wants deep analysis, not summaries.
-
-=== COMPREHENSIVE STOCK DATA ===
+=== STOCK DATA ===
 {stock_context}
-=== END STOCK DATA ==="""
+=== END ==="""
+
+ANALYSIS_PROMPT = _BASE_RULES + """
+
+## Response style
+Provide focused analysis in **200-400 words**. Cover only the specific topic asked. Use markdown headings sparingly (one ### at most). Include relevant numbers and peer context where available.
+
+**Topic-specific guidance:**
+- For competitor/peer questions: compare key metrics (P/E, margins, growth, market cap), discuss competitive advantages (brand, scale, cost leadership, network effects, moat), and market positioning.
+- For risk questions: cross-reference governance, debt, promoter pledge, geopolitical exposure. Rate severity.
+- For growth questions: cite YoY trends, segment drivers, and forward guidance.
+
+=== STOCK DATA ===
+{stock_context}
+=== END ==="""
+
+THESIS_PROMPT = _BASE_RULES + """
+
+## Response style
+Provide comprehensive analysis in **300-500 words**. Structure with clear sections:
+- Bull case (with numbers)
+- Bear case / risks
+- Valuation view
+- Your weighted verdict
+
+=== STOCK DATA ===
+{stock_context}
+=== END ==="""
+
+_PROMPT_MAP = {
+    "factual": FACTUAL_PROMPT,
+    "analysis": ANALYSIS_PROMPT,
+    "thesis": THESIS_PROMPT,
+}
+
+_MAX_TOKENS_MAP = {
+    "factual": 400,
+    "analysis": 1000,
+    "thesis": 1200,
+}
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def _format_number_inr(val: float | None) -> str:
@@ -102,7 +145,6 @@ def _df_to_text(df: pd.DataFrame | None, label: str, max_rows: int = 20) -> str:
         return f"\n[{label}: No data available]\n"
 
     lines = [f"\n--- {label} ---"]
-    # Use first 4 columns (years) and important rows
     cols = df.columns[:4]
     col_labels = [str(c)[:10] for c in cols]
     lines.append(f"{'Item':<40} " + " ".join(f"{c:>15}" for c in col_labels))
@@ -125,13 +167,68 @@ def _df_to_text(df: pd.DataFrame | None, label: str, max_rows: int = 20) -> str:
     return "\n".join(lines)
 
 
+def _df_to_summary(df: pd.DataFrame | None, label: str) -> str:
+    """Extract only key rows from a financial DataFrame for concise context."""
+    if df is None or df.empty:
+        return f"\n[{label}: No data]\n"
+
+    key_rows = [
+        "Total Revenue", "Operating Revenue", "Net Income",
+        "Operating Income", "EBITDA", "Gross Profit",
+        "Total Assets", "Total Debt", "Total Liabilities Net Minority Interest",
+        "Free Cash Flow", "Operating Cash Flow", "Capital Expenditure",
+    ]
+    cols = df.columns[:4]
+    col_labels = [str(c)[:10] for c in cols]
+
+    lines = [f"\n--- {label} (Key Items) ---"]
+    lines.append(f"{'Item':<40} " + " ".join(f"{c:>15}" for c in col_labels))
+    lines.append("-" * (40 + 16 * len(col_labels)))
+
+    matched = 0
+    for idx in df.index:
+        idx_str = str(idx)
+        if any(k.lower() in idx_str.lower() for k in key_rows):
+            row_name = idx_str[:40]
+            values = []
+            for c in cols:
+                val = df.loc[idx, c]
+                if pd.notna(val):
+                    try:
+                        values.append(f"{float(val):>15,.0f}")
+                    except (ValueError, TypeError):
+                        values.append(f"{str(val):>15}")
+                else:
+                    values.append(f"{'N/A':>15}")
+            lines.append(f"{row_name:<40} " + " ".join(values))
+            matched += 1
+
+    if matched == 0:
+        # Fallback: show first 5 rows
+        for idx in df.index[:5]:
+            row_name = str(idx)[:40]
+            values = []
+            for c in cols:
+                val = df.loc[idx, c]
+                if pd.notna(val):
+                    try:
+                        values.append(f"{float(val):>15,.0f}")
+                    except (ValueError, TypeError):
+                        values.append(f"{str(val):>15}")
+                else:
+                    values.append(f"{'N/A':>15}")
+            lines.append(f"{row_name:<40} " + " ".join(values))
+
+    return "\n".join(lines)
+
+
 def _compute_yoy_growth(df: pd.DataFrame, label: str) -> str:
     """Compute YoY growth percentages for key rows in a financial statement."""
     if df is None or df.empty or len(df.columns) < 2:
         return ""
 
     lines = [f"\n--- {label} ---"]
-    cols = df.columns[:4]  # Most recent 4 years
+    cols = df.columns[:4]
 
     for idx in df.index:
         row_name = str(idx)[:40]
@@ -153,127 +250,104 @@ def _compute_yoy_growth(df: pd.DataFrame, label: str) -> str:
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-def serialize_stock_context(profile: dict) -> str:
-    """Convert a StockProfile dict into a structured text block for LLM context."""
+# ---------------------------------------------------------------------------
+# Context serialization — section builders
+# ---------------------------------------------------------------------------
+
+def _build_overview(profile: dict) -> str:
+    """Company overview + key ratios (compact, always included)."""
     sections: list[str] = []
     info = profile.get("info", {})
-    research = profile.get("research_state", {})
-    fin_data = profile.get("financials_data", {})
 
-    # ── Company Overview ──────────────────────────────────────
     sections.append("## COMPANY OVERVIEW")
     sections.append(f"Ticker: {profile.get('ticker', 'N/A')}")
     sections.append(f"Name: {info.get('longName', info.get('shortName', 'N/A'))}")
-    sections.append(f"Sector: {info.get('sector', 'N/A')}")
-    sections.append(f"Industry: {info.get('industry', 'N/A')}")
-    sections.append(f"Current Price: INR {info.get('regularMarketPrice', 'N/A')}")
-    sections.append(f"Market Cap: {_format_number_inr(info.get('marketCap'))}")
-    sections.append(f"52W High: INR {info.get('fiftyTwoWeekHigh', 'N/A')}")
-    sections.append(f"52W Low: INR {info.get('fiftyTwoWeekLow', 'N/A')}")
-    sections.append(f"Beta: {info.get('beta', 'N/A')}")
+    sections.append(f"Sector: {info.get('sector', 'N/A')}  |  Industry: {info.get('industry', 'N/A')}")
+    sections.append(f"Price: INR {info.get('regularMarketPrice', 'N/A')}  |  Mkt Cap: {_format_number_inr(info.get('marketCap'))}")
+    sections.append(f"52W: {info.get('fiftyTwoWeekLow', 'N/A')} – {info.get('fiftyTwoWeekHigh', 'N/A')}  |  Beta: {info.get('beta', 'N/A')}")
 
-    # Company description
     desc = info.get("longBusinessSummary", "")
     if desc:
-        sections.append(f"\nBusiness Description:\n{desc}")
+        sections.append(f"\n{desc[:800]}")
 
-    # ── Key Financial Ratios ──────────────────────────────────
-    sections.append("\n## KEY FINANCIAL RATIOS")
-    ratios = research.get("ratios", {})
-    company_info = research.get("company_info", {})
-
+    sections.append("\n## KEY RATIOS")
     ratio_items = [
-        ("P/E (Trailing)", info.get("trailingPE")),
-        ("P/E (Forward)", info.get("forwardPE")),
-        ("P/B", info.get("priceToBook")),
-        ("P/S", info.get("priceToSalesTrailing12Months")),
-        ("EV/EBITDA", info.get("enterpriseToEbitda")),
-        ("ROE", info.get("returnOnEquity")),
-        ("ROA", info.get("returnOnAssets")),
-        ("Operating Margin", info.get("operatingMargins")),
-        ("Profit Margin", info.get("profitMargins")),
-        ("Debt/Equity", info.get("debtToEquity")),
-        ("Current Ratio", info.get("currentRatio")),
-        ("Revenue Growth", info.get("revenueGrowth")),
-        ("Earnings Growth", info.get("earningsGrowth")),
-        ("Dividend Yield", info.get("dividendYield")),
+        ("P/E(T)", info.get("trailingPE")), ("P/E(F)", info.get("forwardPE")),
+        ("P/B", info.get("priceToBook")), ("EV/EBITDA", info.get("enterpriseToEbitda")),
+        ("ROE", info.get("returnOnEquity")), ("ROA", info.get("returnOnAssets")),
+        ("OPM", info.get("operatingMargins")), ("NPM", info.get("profitMargins")),
+        ("D/E", info.get("debtToEquity")), ("CR", info.get("currentRatio")),
+        ("Rev Growth", info.get("revenueGrowth")), ("Earn Growth", info.get("earningsGrowth")),
+        ("Div Yield", info.get("dividendYield")),
     ]
+    ratio_parts = []
     for label, val in ratio_items:
         if val is not None:
-            if isinstance(val, float) and abs(val) < 10:
-                sections.append(f"  {label}: {val:.2%}" if "Margin" in label or "Growth" in label or "Yield" in label or "ROE" in label or "ROA" in label else f"  {label}: {val:.2f}")
+            if isinstance(val, float) and abs(val) < 10 and ("Margin" in label or "Growth" in label or "Yield" in label or "ROE" in label or "ROA" in label or "OPM" in label or "NPM" in label):
+                ratio_parts.append(f"{label}: {val:.1%}")
             else:
-                sections.append(f"  {label}: {val}")
+                ratio_parts.append(f"{label}: {val:.2f}" if isinstance(val, float) else f"{label}: {val}")
+    sections.append("  " + "  |  ".join(ratio_parts))
 
-    # Additional ratios from analysis agent
+    # Additional key metrics (compact)
+    extra = [
+        ("Total Revenue", info.get("totalRevenue")), ("EBITDA", info.get("ebitda")),
+        ("Net Income", info.get("netIncomeToCommon")), ("FCF", info.get("freeCashflow")),
+        ("Total Debt", info.get("totalDebt")), ("Total Cash", info.get("totalCash")),
+        ("EPS(T)", info.get("trailingEps")), ("EPS(F)", info.get("forwardEps")),
+        ("PEG", info.get("pegRatio")),
+    ]
+    extra_parts = []
+    for label, val in extra:
+        if val is not None:
+            if isinstance(val, float) and abs(val) >= 1e7:
+                extra_parts.append(f"{label}: {_format_number_inr(val)}")
+            else:
+                extra_parts.append(f"{label}: {val}")
+    if extra_parts:
+        sections.append("  " + "  |  ".join(extra_parts))
+
+    return "\n".join(sections)
+
+
+def _build_financials(profile: dict, summarize: bool = False) -> str:
+    """Financial statements + growth rates."""
+    sections: list[str] = []
+    fin_data = profile.get("financials_data", {})
+    research = profile.get("research_state", {})
+
+    sections.append("\n## FINANCIAL STATEMENTS")
+    convert = _df_to_summary if summarize else _df_to_text
+
+    fin_df = fin_data.get("financials")
+    sections.append(convert(fin_df, "INCOME STATEMENT"))
+    if fin_df is not None and not fin_df.empty and not summarize:
+        sections.append(_compute_yoy_growth(fin_df, "INCOME STATEMENT YoY %"))
+
+    bs_df = fin_data.get("balance_sheet")
+    sections.append(convert(bs_df, "BALANCE SHEET"))
+
+    cf_df = fin_data.get("cashflow")
+    sections.append(convert(cf_df, "CASH FLOW"))
+    if cf_df is not None and not cf_df.empty and not summarize:
+        sections.append(_compute_yoy_growth(cf_df, "CASH FLOW YoY %"))
+
+    # Detailed ratios from analysis agent
+    ratios = research.get("ratios", {})
     if ratios:
-        sections.append("\nDetailed Ratios from Analysis:")
+        sections.append("\nDetailed Ratios:")
         for k, v in ratios.items():
             if v is not None and k not in ("error",):
                 sections.append(f"  {k}: {v}")
 
-    # ── Additional Key Metrics ─────────────────────────────────
-    sections.append("\n## ADDITIONAL KEY METRICS")
-    extra_metrics = [
-        ("Enterprise Value", info.get("enterpriseValue")),
-        ("Total Revenue (TTM)", info.get("totalRevenue")),
-        ("EBITDA (TTM)", info.get("ebitda")),
-        ("Net Income (TTM)", info.get("netIncomeToCommon")),
-        ("Total Cash", info.get("totalCash")),
-        ("Total Debt", info.get("totalDebt")),
-        ("Free Cash Flow", info.get("freeCashflow")),
-        ("Operating Cash Flow", info.get("operatingCashflow")),
-        ("Revenue Per Share", info.get("revenuePerShare")),
-        ("Book Value Per Share", info.get("bookValue")),
-        ("Earnings Per Share (TTM)", info.get("trailingEps")),
-        ("Earnings Per Share (Forward)", info.get("forwardEps")),
-        ("PEG Ratio", info.get("pegRatio")),
-        ("Shares Outstanding", info.get("sharesOutstanding")),
-        ("Float Shares", info.get("floatShares")),
-        ("Held by Insiders %", info.get("heldPercentInsiders")),
-        ("Held by Institutions %", info.get("heldPercentInstitutions")),
-    ]
-    for label, val in extra_metrics:
-        if val is not None:
-            if isinstance(val, float) and abs(val) >= 1e7:
-                sections.append(f"  {label}: {_format_number_inr(val)}")
-            elif isinstance(val, float) and abs(val) < 1:
-                sections.append(f"  {label}: {val:.2%}")
-            else:
-                sections.append(f"  {label}: {val}")
+    return "\n".join(sections)
 
-    # ── Financial Statements ──────────────────────────────────
-    sections.append("\n## FINANCIAL STATEMENTS")
 
-    # Income statement
-    fin_df = fin_data.get("financials")
-    sections.append(_df_to_text(fin_df, "INCOME STATEMENT (Annual)"))
+def _build_valuation(profile: dict) -> str:
+    """DCF + peer comparison."""
+    sections: list[str] = []
+    research = profile.get("research_state", {})
 
-    # Compute YoY growth rates from income statement
-    if fin_df is not None and not fin_df.empty:
-        sections.append(_compute_yoy_growth(fin_df, "INCOME STATEMENT YoY GROWTH %"))
-
-    # Balance sheet
-    bs_df = fin_data.get("balance_sheet")
-    sections.append(_df_to_text(bs_df, "BALANCE SHEET (Annual)"))
-
-    # Cash flow
-    cf_df = fin_data.get("cashflow")
-    sections.append(_df_to_text(cf_df, "CASH FLOW STATEMENT (Annual)"))
-
-    if cf_df is not None and not cf_df.empty:
-        sections.append(_compute_yoy_growth(cf_df, "CASH FLOW YoY GROWTH %"))
-
-    # Dividends
-    dividends = fin_data.get("dividends")
-    if dividends is not None and hasattr(dividends, '__len__') and len(dividends) > 0:
-        sections.append("\n--- DIVIDEND HISTORY ---")
-        if hasattr(dividends, 'tail'):
-            recent = dividends.tail(10)
-            for date_idx, val in recent.items():
-                sections.append(f"  {str(date_idx)[:10]}: INR {val:.2f}")
-
-    # ── DCF Valuation ─────────────────────────────────────────
     dcf = research.get("dcf_valuation", {})
     if dcf:
         sections.append("\n## DCF VALUATION")
@@ -281,10 +355,8 @@ def serialize_stock_context(profile: dict) -> str:
         sections.append(f"  Upside/Downside: {dcf.get('upside_pct', 'N/A')}%")
         assumptions = dcf.get("assumptions", {})
         if assumptions:
-            sections.append(f"  WACC: {assumptions.get('wacc', 'N/A')}")
-            sections.append(f"  Terminal Growth: {assumptions.get('terminal_growth', 'N/A')}")
+            sections.append(f"  WACC: {assumptions.get('wacc', 'N/A')}  |  Terminal Growth: {assumptions.get('terminal_growth', 'N/A')}")
 
-    # ── Peer Comparison ───────────────────────────────────────
     peers = research.get("peer_comparison", [])
     if peers:
         sections.append("\n## PEER COMPARISON")
@@ -294,120 +366,184 @@ def serialize_stock_context(profile: dict) -> str:
             for p in peers:
                 if isinstance(p, dict):
                     name = p.get("name", p.get("ticker", "Unknown"))
-                    sections.append(f"\n  {name}:")
-                    for k, v in p.items():
-                        if k not in ("name", "ticker") and v is not None:
-                            sections.append(f"    {k}: {v}")
-
-    # ── Investment Score ──────────────────────────────────────
-    inv_score = research.get("investment_score", {})
-    if inv_score and "composite_score" in inv_score:
-        sections.append("\n## INVESTMENT SCORE")
-        sections.append(format_score_for_prompt(inv_score))
-
-    # ── Indian Market Metrics ─────────────────────────────────
-    indian = research.get("indian_metrics", {})
-    if indian:
-        sections.append("\n## INDIAN MARKET METRICS")
-        roce = indian.get("roce", {})
-        if roce:
-            sections.append(f"  ROCE: {roce.get('roce_value', 'N/A')}")
-            sections.append(f"  ROCE Rating: {roce.get('rating', 'N/A')}")
-
-        shareholding = indian.get("shareholding", {})
-        if shareholding:
-            sections.append(f"  Promoter Holding: {shareholding.get('promoter_pct', 'N/A')}%")
-
-        pledge = indian.get("promoter_pledge", {})
-        if pledge:
-            sections.append(f"  Promoter Pledge: {pledge.get('pledge_pct', 'N/A')}%")
-            sections.append(f"  Pledge Risk: {pledge.get('risk_level', 'N/A')}")
-
-    # ── Sentiment & News ──────────────────────────────────────
-    sentiment = research.get("sentiment_scores", {})
-    if sentiment:
-        sections.append("\n## SENTIMENT ANALYSIS")
-        sections.append(f"  Overall Sentiment: {sentiment.get('overall_score', 'N/A')}")
-        sections.append(f"  Sentiment Label: {sentiment.get('label', 'N/A')}")
-
-    news = research.get("news_summaries", [])
-    if news:
-        sections.append("\n  Recent News Headlines:")
-        for article in news[:10]:
-            sections.append(f"  - {article}")
-
-    # ── Geopolitical Risk ─────────────────────────────────────
-    geo = profile.get("geopolitical", {})
-    if geo:
-        sections.append("\n## GEOPOLITICAL RISK PROFILE")
-        sections.append(f"  Overall Score: {geo.get('overall_score', 'N/A')}/100 (higher = more resilient)")
-        sections.append(f"  Risk Level: {geo.get('risk_level', 'N/A')}")
-        sections.append(f"  Trade Risk: {geo.get('trade_risk_score', 'N/A')}/100")
-        sections.append(f"  Policy Risk: {geo.get('policy_risk_score', 'N/A')}/100")
-        sections.append(f"  Commodity Risk: {geo.get('commodity_risk_score', 'N/A')}/100")
-        sections.append(f"  Event Risk: {geo.get('event_risk_score', 'N/A')}/100")
-
-    # ── Smart Money Lag ───────────────────────────────────────
-    sections.append("\n## SMART MONEY LAG ANALYSIS")
-    imp = profile.get("fundamental_improvement", {})
-    flow = profile.get("institutional_flow", {})
-    lag = profile.get("smart_money_lag", 0)
-    sections.append(f"  Fundamental Improvement Score: {imp.get('score', 'N/A')}/100")
-    sections.append(f"  Institutional Flow Score: {flow.get('score', 'N/A')}/100")
-    sections.append(f"  Smart Money Lag: {lag} (positive = institutions haven't caught up)")
-    imp_details = imp.get("details", {})
-    if imp_details:
-        for k, v in imp_details.items():
-            sections.append(f"    {k}: {v}")
-
-    # ── Management Credibility ────────────────────────────────
-    cred = profile.get("credibility", {})
-    if cred:
-        sections.append("\n## MANAGEMENT CREDIBILITY")
-        sections.append(f"  Score: {cred.get('score', 'N/A')}/100")
-        sections.append(f"  Method: {cred.get('method', 'N/A')}")
-        sections.append(f"  Reasoning: {cred.get('reasoning', 'N/A')}")
-
-    # ── Regulatory Environment ────────────────────────────────
-    reg = profile.get("regulatory", {})
-    if reg:
-        sections.append("\n## REGULATORY ENVIRONMENT")
-        sections.append(f"  Score: {reg.get('score', 'N/A')}/100")
-        sections.append(f"  Net Signal: {reg.get('net_signal', 'N/A')}")
-        tailwinds = reg.get("tailwind_policies", [])
-        headwinds = reg.get("headwind_policies", [])
-        if tailwinds:
-            sections.append(f"  Tailwind Policies: {', '.join(tailwinds)}")
-        if headwinds:
-            sections.append(f"  Headwind Policies: {', '.join(headwinds)}")
-
-    # ── Promoter Behavior ─────────────────────────────────────
-    buying = profile.get("promoter_buying", {})
-    rpt = profile.get("related_party", {})
-    if buying.get("has_data"):
-        sections.append("\n## PROMOTER BEHAVIOR")
-        sections.append(f"  Buying Signal: {buying.get('signal', 'N/A')}")
-        sections.append(f"  Promoter Buys: {buying.get('buys', 0)}")
-        sections.append(f"  Promoter Sells: {buying.get('sells', 0)}")
-    if rpt:
-        sections.append(f"  Related Party Transactions: {rpt.get('rpt_count', 0)} filings")
-        sections.append(f"  RPT Anomaly: {'Yes' if rpt.get('has_anomaly') else 'No'}")
-
-    # ── Full Research Report ──────────────────────────────────
-    report = research.get("final_report", "")
-    if report:
-        sections.append("\n## FULL RESEARCH REPORT")
-        sections.append(report[:8000])  # Limit to avoid token overflow
+                    items = [f"{k}: {v}" for k, v in p.items() if k not in ("name", "ticker") and v is not None]
+                    sections.append(f"  {name}: {' | '.join(items)}")
 
     return "\n".join(sections)
 
+
+def _build_risk_governance(profile: dict) -> str:
+    """Geopolitical, regulatory, promoter, management — risk/governance data."""
+    sections: list[str] = []
+
+    geo = profile.get("geopolitical", {})
+    if geo:
+        sections.append("\n## GEOPOLITICAL RISK")
+        sections.append(f"  Overall: {geo.get('overall_score', 'N/A')}/100 | Trade: {geo.get('trade_risk_score', 'N/A')} | Policy: {geo.get('policy_risk_score', 'N/A')} | Commodity: {geo.get('commodity_risk_score', 'N/A')} | Event: {geo.get('event_risk_score', 'N/A')}")
+
+    reg = profile.get("regulatory", {})
+    if reg:
+        sections.append("\n## REGULATORY")
+        sections.append(f"  Score: {reg.get('score', 'N/A')}/100 | Signal: {reg.get('net_signal', 'N/A')}")
+        tw = reg.get("tailwind_policies", [])
+        hw = reg.get("headwind_policies", [])
+        if tw:
+            sections.append(f"  Tailwinds: {', '.join(tw)}")
+        if hw:
+            sections.append(f"  Headwinds: {', '.join(hw)}")
+
+    cred = profile.get("credibility", {})
+    if cred:
+        sections.append("\n## MANAGEMENT CREDIBILITY")
+        sections.append(f"  Score: {cred.get('score', 'N/A')}/100 | {cred.get('reasoning', '')}")
+
+    buying = profile.get("promoter_buying", {})
+    rpt = profile.get("related_party", {})
+    if buying.get("has_data") or rpt:
+        sections.append("\n## PROMOTER BEHAVIOR")
+        if buying.get("has_data"):
+            sections.append(f"  Signal: {buying.get('signal', 'N/A')} | Buys: {buying.get('buys', 0)} | Sells: {buying.get('sells', 0)}")
+        if rpt:
+            sections.append(f"  RPT: {rpt.get('rpt_count', 0)} filings | Anomaly: {'Yes' if rpt.get('has_anomaly') else 'No'}")
+
+    # Smart money
+    imp = profile.get("fundamental_improvement", {})
+    flow = profile.get("institutional_flow", {})
+    lag = profile.get("smart_money_lag", 0)
+    if imp or flow:
+        sections.append("\n## SMART MONEY LAG")
+        sections.append(f"  Fundamental: {imp.get('score', 'N/A')}/100 | Institutional: {flow.get('score', 'N/A')}/100 | Lag: {lag}")
+
+    # Indian metrics
+    indian = profile.get("research_state", {}).get("indian_metrics", {})
+    if indian:
+        roce = indian.get("roce", {})
+        sh = indian.get("shareholding", {})
+        pledge = indian.get("promoter_pledge", {})
+        parts = []
+        if roce:
+            parts.append(f"ROCE: {roce.get('roce_value', 'N/A')} ({roce.get('rating', '')})")
+        if sh:
+            parts.append(f"Promoter: {sh.get('promoter_pct', 'N/A')}%")
+        if pledge:
+            parts.append(f"Pledge: {pledge.get('pledge_pct', 'N/A')}% ({pledge.get('risk_level', '')})")
+        if parts:
+            sections.append("\n## INDIAN METRICS")
+            sections.append("  " + " | ".join(parts))
+
+    return "\n".join(sections)
+
+
+def _build_sentiment(profile: dict) -> str:
+    """Sentiment + news."""
+    sections: list[str] = []
+    research = profile.get("research_state", {})
+
+    sentiment = research.get("sentiment_scores", {})
+    if sentiment:
+        sections.append("\n## SENTIMENT")
+        sections.append(f"  Score: {sentiment.get('overall_score', 'N/A')} | Label: {sentiment.get('label', 'N/A')}")
+
+    news = research.get("news_summaries", [])
+    if news:
+        sections.append("  Headlines:")
+        for article in news[:8]:
+            sections.append(f"  - {article}")
+
+    return "\n".join(sections)
+
+
+def _build_report(profile: dict) -> str:
+    """Full research report (truncated)."""
+    report = profile.get("research_state", {}).get("final_report", "")
+    if report:
+        return f"\n## RESEARCH REPORT\n{report[:4000]}"
+    return ""
+
+
+def _build_score(profile: dict) -> str:
+    """Investment score section."""
+    inv_score = profile.get("research_state", {}).get("investment_score", {})
+    if inv_score and "composite_score" in inv_score:
+        return "\n## INVESTMENT SCORE\n" + format_score_for_prompt(inv_score)
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Full context (backward-compatible)
+# ---------------------------------------------------------------------------
+
+def serialize_stock_context(profile: dict) -> str:
+    """Convert a StockProfile dict into a structured text block for LLM context.
+
+    This is the full dump — used for thesis-level questions and
+    by external callers that need the complete context.
+    """
+    parts = [
+        _build_overview(profile),
+        _build_financials(profile, summarize=False),
+        _build_valuation(profile),
+        _build_risk_governance(profile),
+        _build_sentiment(profile),
+        _build_score(profile),
+        _build_report(profile),
+    ]
+    return "\n".join(p for p in parts if p)
+
+
+# ---------------------------------------------------------------------------
+# Question-aware context filter
+# ---------------------------------------------------------------------------
+
+def filter_context_for_question(profile: dict, q_type: str) -> str:
+    """Return only sections relevant to the question type.
+
+    factual  -> overview + ratios only (~500 tokens)
+    analysis -> overview + financials(summary) + valuation + relevant risk (~2K tokens)
+    thesis   -> everything with summarized tables (~3K tokens)
+    """
+    if q_type == "factual":
+        parts = [
+            _build_overview(profile),
+            _build_score(profile),
+        ]
+    elif q_type == "analysis":
+        # Include report snippet for richer context (competitive landscape, etc.)
+        report_snippet = _build_report(profile)
+        if len(report_snippet) > 2000:
+            report_snippet = report_snippet[:2000] + "\n[...truncated]"
+        parts = [
+            _build_overview(profile),
+            _build_financials(profile, summarize=True),
+            _build_valuation(profile),
+            _build_risk_governance(profile),
+            _build_sentiment(profile),
+            _build_score(profile),
+            report_snippet,
+        ]
+    else:  # thesis
+        parts = [
+            _build_overview(profile),
+            _build_financials(profile, summarize=True),
+            _build_valuation(profile),
+            _build_risk_governance(profile),
+            _build_sentiment(profile),
+            _build_score(profile),
+            _build_report(profile),
+        ]
+    return "\n".join(p for p in parts if p)
+
+
+# ---------------------------------------------------------------------------
+# Main Q&A entry point
+# ---------------------------------------------------------------------------
 
 def ask_stock_question(
     question: str,
     profile: dict,
     chat_history: list[dict],
 ) -> str:
-    """Answer a question about a stock using the full profile as context.
+    """Answer a question about a stock using filtered profile context.
 
     Args:
         question: The user's question.
@@ -420,11 +556,14 @@ def ask_stock_question(
     company_name = info.get("longName", info.get("shortName", profile.get("ticker", "Unknown")))
     ticker = profile.get("ticker", "Unknown")
 
-    # Serialize context
-    context = serialize_stock_context(profile)
+    # Classify and filter
+    q_type = classify_question(question)
+    context = filter_context_for_question(profile, q_type)
+    max_tokens = _MAX_TOKENS_MAP[q_type]
 
     # Build system prompt
-    system_prompt = DEEP_DIVE_SYSTEM_PROMPT.format(
+    prompt_template = _PROMPT_MAP[q_type]
+    system_prompt = prompt_template.format(
         company_name=company_name,
         ticker=ticker,
         stock_context=context,
@@ -441,8 +580,8 @@ def ask_stock_question(
 
     messages.append(HumanMessage(content=question))
 
-    # Call LLM with higher max_tokens for detailed responses
+    # Call LLM
     llm = get_llm()
-    response = llm.invoke(messages, max_tokens=4096)
+    response = llm.invoke(messages, max_tokens=max_tokens, temperature=0.3)
 
     return response.content if hasattr(response, "content") else str(response)

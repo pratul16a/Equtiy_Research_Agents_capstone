@@ -26,6 +26,7 @@ MAX_DEBATE_STOCKS = 3
 DEBATE_ROUNDS = 2
 # Use GPT-4o for debate quality via OpenRouter
 DEBATE_MODEL = "openai/gpt-4o"
+DEBATE_FALLBACK_MODEL = "google/gemini-2.0-flash-001"  # Fallback if primary fails
 
 
 def _get_rag_context(symbol: str, query: str, k: int = 5) -> str:
@@ -113,8 +114,14 @@ Format: numbered list of arguments, each with a specific data point."""
         response = llm.invoke(prompt)
         return response.content.strip()
     except Exception as e:
-        logger.error("Bull Agent failed for %s: %s", ticker, e)
-        return f"Bull Agent error: {e}"
+        logger.warning("Bull Agent primary model failed for %s: %s — trying fallback", ticker, e)
+        try:
+            llm = get_llm(temperature=0.5, model=DEBATE_FALLBACK_MODEL)
+            response = llm.invoke(prompt)
+            return response.content.strip()
+        except Exception as e2:
+            logger.error("Bull Agent fallback also failed for %s: %s", ticker, e2)
+            return f"Bull Agent error: {e}"
 
 
 def run_bear_agent(
@@ -164,7 +171,13 @@ Format: numbered list of arguments, each with a specific data point."""
         response = llm.invoke(prompt)
         return response.content.strip()
     except Exception as e:
-        logger.error("Bear Agent failed for %s: %s", ticker, e)
+        logger.warning("Bear Agent primary model failed for %s: %s — trying fallback", ticker, e)
+        try:
+            llm = get_llm(temperature=0.5, model=DEBATE_FALLBACK_MODEL)
+            response = llm.invoke(prompt)
+            return response.content.strip()
+        except Exception as e2:
+            logger.error("Bear Agent fallback also failed for %s: %s", ticker, e2)
         return f"Bear Agent error: {e}"
 
 
@@ -212,21 +225,26 @@ Respond with ONLY a JSON object (no markdown fences):
     "bear_strength": <1-10>
 }}"""
 
-    try:
-        llm = get_llm(temperature=0.2, model=DEBATE_MODEL)
+    def _invoke_judge(model_name: str):
+        llm = get_llm(temperature=0.2, model=model_name)
         response = llm.invoke(prompt)
         content = response.content.strip().strip("```json").strip("```").strip()
         result = json.loads(content)
-
         required = ["conviction_score", "recommendation", "reasoning"]
         for field in required:
             if field not in result:
                 result[field] = "Error: missing field"
-
         return result
 
+    try:
+        return _invoke_judge(DEBATE_MODEL)
     except json.JSONDecodeError as e:
         logger.error("Judge Agent JSON parse error for %s: %s", ticker, e)
+        # Retry with fallback model
+        try:
+            return _invoke_judge(DEBATE_FALLBACK_MODEL)
+        except Exception:
+            pass
         return {
             "conviction_score": 5,
             "recommendation": "HOLD",
@@ -236,7 +254,11 @@ Respond with ONLY a JSON object (no markdown fences):
             "bear_strength": 5,
         }
     except Exception as e:
-        logger.error("Judge Agent failed for %s: %s", ticker, e)
+        logger.warning("Judge Agent primary failed for %s: %s — trying fallback", ticker, e)
+        try:
+            return _invoke_judge(DEBATE_FALLBACK_MODEL)
+        except Exception as e2:
+            logger.error("Judge Agent fallback also failed for %s: %s", ticker, e2)
         return {
             "conviction_score": 5,
             "recommendation": "HOLD",

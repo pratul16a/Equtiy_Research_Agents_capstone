@@ -12,7 +12,7 @@ from datetime import datetime
 
 # ── Page Config ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="Indian Equity Research Analyst",
+    page_title="AlphaLens",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -126,6 +126,19 @@ st.markdown("""
         font-weight: 700; font-size: 1rem; letter-spacing: 0.03em;
     }
 </style>
+""", unsafe_allow_html=True)
+
+# ── AlphaLens Logo ───────────────────────────────────────────
+st.markdown("""
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" width="300" height="100">
+  <circle cx="45" cy="45" r="36" fill="none" stroke="#0D9488" stroke-width="3"/>
+  <circle cx="45" cy="45" r="28" fill="none" stroke="#0D9488" stroke-width="1.5" opacity="0.5"/>
+  <line x1="73" y1="67" x2="93" y2="87" stroke="#0D9488" stroke-width="3" stroke-linecap="round"/>
+  <polyline points="25,57 35,49 45,53 55,37 65,41" fill="none" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="55" cy="37" r="3" fill="#14B8A6"/>
+  <text x="110" y="40" style="font-family: Calibri, Arial, sans-serif; font-size: 30px; font-weight: 600; fill: #1E293B;">Alpha</text>
+  <text x="110" y="68" style="font-family: Calibri, Arial, sans-serif; font-size: 30px; font-weight: 400; fill: #0D9488;">Lens</text>
+</svg>
 """, unsafe_allow_html=True)
 
 
@@ -276,7 +289,7 @@ with st.sidebar:
 
     analysis_mode = st.radio(
         "Navigation",
-        ["Market Breadth", "Momentum Screener", "Value Screener", "Stock Diagnostic", "Stock Deep Dive"],
+        ["Command Center", "Market Breadth", "Trend Rider", "Turnaround Hunter", "Stock Diagnostic", "Stock Deep Dive"],
         key="analysis_mode_radio",
     )
 
@@ -307,10 +320,10 @@ with st.sidebar:
         run_breadth = st.button("Run Breadth Analysis", type="primary", use_container_width=True)
         st.caption("Fetches data for ~500 stocks. First run ~45-60s. Cached for 10 min.")
 
-    elif analysis_mode == "Momentum Screener":
+    elif analysis_mode == "Trend Rider":
         st.markdown('<span style="color:#00D4AA; font-size:11px; letter-spacing:0.1em; font-weight:700;">MOMENTUM CONTROLS</span>', unsafe_allow_html=True)
         st.caption("5 gates · 17 criteria · Strong stocks in strong sectors")
-        run_momentum = st.button("Run Momentum Screener", type="primary", use_container_width=True)
+        run_momentum = st.button("Run Trend Rider", type="primary", use_container_width=True)
         debate_mode = st.radio(
             "AI Debate", ["Off", "Quick (RAG + 1 LLM call, ~20s)", "Deep (multi-round GPT-4o, ~2min)"],
             index=1, horizontal=True, key="mom_debate_mode",
@@ -354,10 +367,10 @@ with st.sidebar:
             run_momentum = True
             st.session_state["_run_both"] = True
 
-    elif analysis_mode == "Value Screener":
+    elif analysis_mode == "Turnaround Hunter":
         st.markdown('<span style="color:#4DA6FF; font-size:11px; letter-spacing:0.1em; font-weight:700;">VALUE CONTROLS</span>', unsafe_allow_html=True)
         st.caption("28 criteria · Turnaround candidates at valuation floors")
-        run_value = st.button("Run Value Screener", type="primary", use_container_width=True)
+        run_value = st.button("Run Turnaround Hunter", type="primary", use_container_width=True)
         debate_mode = st.radio(
             "AI Debate", ["Off", "Quick (RAG + 1 LLM call, ~20s)", "Deep (multi-round GPT-4o, ~2min)"],
             index=1, horizontal=True, key="val_debate_mode",
@@ -485,6 +498,13 @@ if "deep_dive_messages" not in st.session_state:
     st.session_state.deep_dive_messages = []
 if "deep_dive_ticker" not in st.session_state:
     st.session_state.deep_dive_ticker = ""
+# Screener tab deep dive (separate from Stock Deep Dive page)
+if "screener_dd_profile" not in st.session_state:
+    st.session_state.screener_dd_profile = None
+if "screener_dd_messages" not in st.session_state:
+    st.session_state.screener_dd_messages = []
+if "screener_dd_ticker" not in st.session_state:
+    st.session_state.screener_dd_ticker = ""
 
 
 # ── Market Breadth Render Functions ──────────────────────────
@@ -1402,9 +1422,278 @@ def run_full_pipeline(ticker_val: str):
 
 
 # ── Main Content ─────────────────────────────────────────────
-st.markdown('<p class="main-header">Indian Equity Research Analyst</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Multi-agent investment research for NSE/BSE stocks powered by LangGraph + LLM</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">AlphaLens</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Deep Dive + Debate Command Center</p>', unsafe_allow_html=True)
 st.divider()
+
+# ── Command Center Mode ─────────────────────────────────────
+if analysis_mode == "Command Center":
+    # ── KPIs ─────────────────────────────────────────────────────
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        selected_count = len(st.session_state.get('selected_tickers', []))
+        st.metric("Selected Stocks", selected_count)
+    with col2:
+        deep_dive_count = len(st.session_state.get('selected_profiles', {}))
+        st.metric("Deep Dives Completed", deep_dive_count)
+    with col3:
+        debate_count = len(st.session_state.get('debate_results', []))
+        st.metric("Debates Completed", debate_count)
+    with col4:
+        st.metric("Last Run", "00:00:00")  # TODO: track timestamp
+
+    st.divider()
+
+    # ── 3-Column Command Center ──────────────────────────────────
+    left_col, mid_col, right_col = st.columns([0.26, 0.42, 0.32])
+
+    # Left: Stock Selection
+    with left_col:
+        st.subheader("Stock Selection")
+        # Get all tickers from screener data
+        screener_data = st.session_state.get('category_screener_data', {})
+        category_results = screener_data.get('category_results', {}) if isinstance(screener_data, dict) else {}
+        momentum_stocks = category_results.get('Momentum', []) if isinstance(category_results, dict) else []
+        value_stocks = category_results.get('ValueBottom', []) if isinstance(category_results, dict) else []
+        all_tickers = list(set([stock['ticker'] for stock in momentum_stocks + value_stocks if isinstance(stock, dict) and 'ticker' in stock]))
+
+        # Auto-select from last screener run if no selection exists yet
+        if not st.session_state.get('selected_tickers') and all_tickers:
+            auto_count = min(5, len(all_tickers))
+            top_tickers = []
+            for pool in (momentum_stocks, value_stocks):
+                for s in pool:
+                    if not isinstance(s, dict):
+                        continue
+                    t = s.get('ticker')
+                    if t and t not in top_tickers:
+                        top_tickers.append(t)
+                        if len(top_tickers) >= auto_count:
+                            break
+                if len(top_tickers) >= auto_count:
+                    break
+            if not top_tickers:
+                top_tickers = all_tickers[:auto_count]
+            st.session_state.selected_tickers = top_tickers
+            st.info(f"Auto-selected {len(top_tickers)} from screener results in Command Center")
+
+        selected_tickers = st.multiselect("Select Stocks", options=all_tickers, default=st.session_state.get('selected_tickers', []), key="selected_tickers")
+        
+        if st.button("Run Deep Dive for selected", key="run_deep_dive_selected"):
+            if not selected_tickers:
+                st.warning("Select stocks first")
+            else:
+                with st.spinner("Loading profiles for selected stocks..."):
+                    from app.tools.stock_deep_dive import build_stock_profile
+                    profiles = {}
+                    for ticker in selected_tickers:
+                        try:
+                            profile = build_stock_profile(ticker)
+                            profiles[ticker] = profile
+                        except Exception as e:
+                            st.error(f"Failed to load profile for {ticker}: {e}")
+                    st.session_state.selected_profiles = profiles
+                    st.success("Profiles loaded!")
+
+        if st.button("Run Deep Dive Top 3", key="run_deep_dive_top3"):
+            candidate_tickers = selected_tickers or all_tickers
+            if not candidate_tickers:
+                st.warning("No screener tickers available")
+            else:
+                chosen = candidate_tickers[:3]
+                with st.spinner(f"Loading top 3 deep-dive profiles: {', '.join(chosen)}..."):
+                    from app.tools.stock_deep_dive import build_stock_profile
+                    profiles = st.session_state.get('selected_profiles', {}) or {}
+                    for ticker in chosen:
+                        if ticker not in profiles:
+                            try:
+                                profiles[ticker] = build_stock_profile(ticker)
+                            except Exception as e:
+                                st.error(f"Failed to load profile for {ticker}: {e}")
+                    st.session_state.selected_profiles = profiles
+                    st.session_state.selected_tickers = chosen
+                    st.success(f"Loaded top 3 deep dive: {', '.join(chosen)}")
+        if st.button("Run Debate for selected", key="run_debate_selected_right"):
+            if not selected_tickers:
+                st.warning("Select stocks first")
+            else:
+                with st.spinner("Running category screener on selected stocks..."):
+                    from app.tools.screener.category_screener import run_category_screener
+                    result = run_category_screener("momentum", tickers=selected_tickers)
+                    usp_cards = result["usp_cards"]
+                    category_results = result["category_results"]
+                with st.spinner("Running debate..."):
+                    from app.agents.debate_agents import run_debate
+                    debate_results = []
+                    for ticker in selected_tickers[:3]:  # limit to 3 for speed
+                        res = run_debate(ticker, usp_cards, category_results, rounds=1)
+                        debate_results.append(res)
+                    st.session_state.debate_results = debate_results
+                    st.success("Debate complete!")
+        
+        # Per-stock actions
+        for ticker in selected_tickers:
+            with st.container():
+                st.markdown(f"### {ticker}")
+                # Minimal metrics (next enhancement: real market data)
+                st.metric("Price", "₹100")  # placeholder
+                if st.button(f"Deep Dive Chat - {ticker}", key=f"dive_{ticker}"):
+                    if ticker not in st.session_state.get('selected_profiles', {}):
+                        with st.spinner(f"Loading profile for {ticker}..."):
+                            from app.tools.stock_deep_dive import build_stock_profile
+                            try:
+                                profile = build_stock_profile(ticker)
+                                st.session_state.selected_profiles = st.session_state.get('selected_profiles', {})
+                                st.session_state.selected_profiles[ticker] = profile
+                                st.success(f"Profile loaded for {ticker}")
+                            except Exception as e:
+                                st.error(f"Deep dive profile load failed: {e}")
+                                profile = None
+                    else:
+                        profile = st.session_state.selected_profiles[ticker]
+
+                    if profile:
+                        st.session_state.deep_dive_ticker = ticker
+                        st.session_state.deep_dive_profile = profile
+                        st.session_state.deep_dive_messages = []
+                        st.success(f"Deep Dive ready for {ticker}")
+
+                if st.button(f"Run Debate - {ticker}", key=f"debate_{ticker}"):
+                    with st.spinner(f"Running debate for {ticker}..."):
+                        from app.agents.debate_agents import run_debate
+                        cdata = st.session_state.get("category_screener_data", {})
+                        cat_results = cdata.get("category_results", {})
+                        usp_cards = cdata.get("usp_cards", {})
+                        try:
+                            result = run_debate(ticker, usp_cards, cat_results if isinstance(cat_results, dict) else [])
+                            dr = st.session_state.get("debate_results", [])
+                            dr = [d for d in dr if d.get("ticker") != ticker]
+                            dr.append(result)
+                            st.session_state.debate_results = dr
+                            st.success(f"Debate complete for {ticker}")
+                        except Exception as e:
+                            st.error(f"Debate for {ticker} failed: {e}")
+
+    # Middle: Deep Dive Chat
+    with mid_col:
+        st.subheader("Deep Dive Chat")
+        available_profiles = list(st.session_state.get("selected_profiles", {}).keys())
+        if not available_profiles:
+            st.info("Run 'Deep Dive for selected' to load profiles first.")
+            chat_ticker = None
+        else:
+            chat_ticker = st.selectbox("Select stock for chat", options=available_profiles, key="chat_ticker")
+        
+        if chat_ticker:
+            if chat_ticker != st.session_state.get("deep_dive_ticker"):
+                st.session_state.deep_dive_ticker = chat_ticker
+                st.session_state.deep_dive_profile = st.session_state.selected_profiles.get(chat_ticker)
+                st.session_state.deep_dive_messages = []
+            
+            # Display profile metrics
+            profile = st.session_state.deep_dive_profile
+            if not profile:
+                st.warning(f"No deep dive profile data available for {chat_ticker}. Please run profile load again.")
+            elif not profile.get("financials_data") and not profile.get("research_state"):
+                st.warning("Profile has limited data. Consider running the screener + stock profile pipeline again for richer data.")
+
+            if profile:
+                info = profile.get("info", {})
+                col1, col2 = st.columns(2)
+                with col1:
+                    market_cap = info.get("marketCap")
+                    if market_cap:
+                        market_cap_str = f"₹{market_cap / 1e7:.1f} Cr"
+                    else:
+                        market_cap_str = "N/A"
+                    st.metric("Market Cap", market_cap_str)
+                    pe = info.get("trailingPE") or info.get("forwardPE")
+                    st.metric("P/E Ratio", f"{pe:.2f}" if pe else "N/A")
+                with col2:
+                    # Revenue from latest financials
+                    fin_data = profile.get("financials_data", {})
+                    revenue = fin_data.get("total_revenue", {}).get("latest", "N/A")
+                    if isinstance(revenue, (int, float)):
+                        revenue_str = f"₹{revenue / 1e7:.1f} Cr"
+                    else:
+                        revenue_str = "N/A"
+                    st.metric("Revenue", revenue_str)
+                    # Net profit
+                    net_profit = fin_data.get("net_income", {}).get("latest", "N/A")
+                    if isinstance(net_profit, (int, float)):
+                        net_profit_str = f"₹{net_profit / 1e7:.1f} Cr"
+                    else:
+                        net_profit_str = "N/A"
+                    st.metric("Net Profit", net_profit_str)
+        
+        # Chat history
+        chat_history = st.session_state.get('deep_dive_messages', [])
+        for msg in chat_history:
+            st.chat_message(msg['role']).write(msg['content'])
+        
+        # Chat input
+        user_prompt = st.chat_input("Ask analyst question...", key="chat_input")
+        if user_prompt:
+            if not st.session_state.get('deep_dive_profile'):
+                st.error("Please select a stock with loaded profile first.")
+            else:
+                st.session_state.deep_dive_messages.append({"role": "user", "content": user_prompt})
+                with st.chat_message("assistant"):
+                    with st.spinner("Analyzing..."):
+                        try:
+                            from app.deep_dive_chat import ask_stock_question
+                            response = ask_stock_question(
+                                user_prompt,
+                                st.session_state.deep_dive_profile,
+                                st.session_state.deep_dive_messages[:-1],
+                            )
+                            st.markdown(response)
+                            st.session_state.deep_dive_messages.append({"role": "assistant", "content": response})
+                        except Exception as e:
+                            error_msg = f"Error generating response: {e}"
+                            st.error(error_msg)
+                            st.session_state.deep_dive_messages.append({"role": "assistant", "content": error_msg})
+
+    # Right: Debate Engine
+    with right_col:
+        st.subheader("Debate Engine")
+        debate_mode = st.radio("Mode", ["Off", "Quick", "Deep"], key="debate_mode")
+        if debate_mode != "Off":
+            if st.button("Run Debate for selected", key="run_debate_selected"):
+                if not selected_tickers:
+                    st.warning("Select stocks first")
+                else:
+                    with st.spinner("Running category screener on selected stocks..."):
+                        from app.tools.screener.category_screener import run_category_screener
+                        result = run_category_screener("momentum", tickers=selected_tickers)
+                        usp_cards = result["usp_cards"]
+                        category_results = result["category_results"]
+                    with st.spinner("Running debate..."):
+                        from app.agents.debate_agents import run_debate
+                        debate_results = []
+                        for ticker in selected_tickers[:3]:  # limit to 3 for speed
+                            res = run_debate(ticker, usp_cards, category_results, rounds=1 if debate_mode == "Quick" else 2)
+                            debate_results.append(res)
+                        st.session_state.debate_results = debate_results
+                        st.success("Debate complete!")
+        # Display debate results
+        debate_results = st.session_state.get("debate_results", [])
+        for result in debate_results:
+            ticker = result["ticker"]
+            verdict = result["verdict"]
+            with st.expander(f"{ticker} Debate - {verdict['recommendation']} (Score: {verdict['conviction_score']}/10)"):
+                st.write(f"**Reasoning:** {verdict['reasoning']}")
+                st.write(f"**Key Factors:** {', '.join(verdict['key_factors'])}")
+                st.write(f"**Bull Strength:** {verdict['bull_strength']}/10 | **Bear Strength:** {verdict['bear_strength']}/10")
+                if st.checkbox(f"Show full transcript for {ticker}", key=f"transcript_{ticker}"):
+                    for i, (bull, bear) in enumerate(zip(result["bull_arguments"], result["bear_arguments"]), 1):
+                        st.markdown(f"**Round {i}:**")
+                        st.markdown("**Bull:** " + bull.replace("\n", "  \n"))
+                        st.markdown("**Bear:** " + bear.replace("\n", "  \n"))
+
+    st.stop()  # Stop here for Command Center mode
+
+# ── Legacy Mode Content ──────────────────────────────────────
 
 # ── Stock Diagnostic Mode ────────────────────────────────────
 if analysis_mode == "Stock Diagnostic":
@@ -1599,107 +1888,8 @@ if analysis_mode == "Stock Deep Dive":
 
     profile = st.session_state.deep_dive_profile
     if profile:
-        info = profile.get("info", {})
-        research = profile.get("research_state", {})
-        company_name = info.get("longName", info.get("shortName", profile.get("ticker", "")))
-
-        # ── Scorecard ─────────────────────────────────────────
-        st.markdown(f"### {company_name}")
-
-        c1, c2, c3, c4, c5 = st.columns(5)
-        with c1:
-            price = info.get("regularMarketPrice", "N/A")
-            render_metric_card("Price", f"INR {price}", accent="#00D4AA")
-        with c2:
-            mcap = info.get("marketCap")
-            if mcap:
-                mcap_display = f"{mcap/1e7:.0f} Cr" if mcap >= 1e7 else f"{mcap:,.0f}"
-            else:
-                mcap_display = "N/A"
-            render_metric_card("Market Cap", mcap_display, accent="#4DA6FF")
-        with c3:
-            inv_score = research.get("investment_score", {})
-            comp_score = inv_score.get("composite_score", "N/A")
-            rec = inv_score.get("recommendation", "")
-            render_metric_card("Investment Score", f"{comp_score}/100", delta=rec, delta_up=True, accent="#00D4AA")
-        with c4:
-            geo = profile.get("geopolitical", {})
-            render_metric_card("Geo Risk", geo.get("risk_level", "N/A"), delta=f"{geo.get('overall_score', 'N/A')}/100", accent="#FFA726")
-        with c5:
-            lag = profile.get("smart_money_lag", 0)
-            lag_label = "Opportunity" if lag > 20 else "Neutral" if lag > -10 else "Crowded"
-            render_metric_card("Smart Money Lag", f"{lag}", delta=lag_label, delta_up=lag > 0, accent="#B388FF")
-
-        # ── USP Analysis Expander ─────────────────────────────
-        with st.expander("USP Analysis Details", expanded=False):
-            ucol1, ucol2 = st.columns(2)
-            with ucol1:
-                st.markdown("**Geopolitical Risk**")
-                geo = profile.get("geopolitical", {})
-                st.write(f"- Trade Risk: {geo.get('trade_risk_score', 'N/A')}/100")
-                st.write(f"- Policy Risk: {geo.get('policy_risk_score', 'N/A')}/100")
-                st.write(f"- Commodity Risk: {geo.get('commodity_risk_score', 'N/A')}/100")
-                st.write(f"- Event Risk: {geo.get('event_risk_score', 'N/A')}/100")
-
-                st.markdown("**Management Credibility**")
-                cred = profile.get("credibility", {})
-                st.write(f"- Score: {cred.get('score', 'N/A')}/100 ({cred.get('method', '')})")
-                st.write(f"- {cred.get('reasoning', 'N/A')}")
-
-            with ucol2:
-                st.markdown("**Regulatory Environment**")
-                reg = profile.get("regulatory", {})
-                st.write(f"- Net Signal: {reg.get('net_signal', 'N/A')} (Score: {reg.get('score', 'N/A')})")
-                tailwinds = reg.get("tailwind_policies", [])
-                if tailwinds:
-                    st.write(f"- Tailwinds: {', '.join(tailwinds)}")
-                headwinds = reg.get("headwind_policies", [])
-                if headwinds:
-                    st.write(f"- Headwinds: {', '.join(headwinds)}")
-
-                st.markdown("**Promoter Behavior**")
-                buying = profile.get("promoter_buying", {})
-                st.write(f"- Signal: {buying.get('signal', 'N/A')}")
-                st.write(f"- Buys: {buying.get('buys', 0)} | Sells: {buying.get('sells', 0)}")
-                rpt = profile.get("related_party", {})
-                st.write(f"- RPT Anomaly: {'Yes' if rpt.get('has_anomaly') else 'No'}")
-
-        # ── Investment Score Expander ──────────────────────────
-        if inv_score and "dimension_scores" in inv_score:
-            with st.expander("Investment Score Breakdown", expanded=False):
-                render_investment_score(inv_score)
-
-        # ── Chat Interface ────────────────────────────────────
-        st.divider()
-        st.markdown("### Ask Questions About This Stock")
-        st.caption("Examples: Products offered, revenue by segment, competitors, competitive edge, strengths, risks, red flags")
-
-        # Display chat history
-        for msg in st.session_state.deep_dive_messages:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-
-        # Chat input
-        if prompt := st.chat_input(f"Ask about {company_name}..."):
-            st.session_state.deep_dive_messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
-            with st.chat_message("assistant"):
-                with st.spinner("Analyzing..."):
-                    try:
-                        from app.deep_dive_chat import ask_stock_question
-                        response = ask_stock_question(
-                            prompt,
-                            profile,
-                            st.session_state.deep_dive_messages[:-1],
-                        )
-                        st.markdown(response)
-                        st.session_state.deep_dive_messages.append({"role": "assistant", "content": response})
-                    except Exception as e:
-                        error_msg = f"Error generating response: {e}"
-                        st.error(error_msg)
-                        st.session_state.deep_dive_messages.append({"role": "assistant", "content": error_msg})
+        render_stock_profile_scorecard(profile)
+        render_deep_dive_chat(profile, "deep_dive_messages", "deep_dive_ticker")
 
     else:
         st.markdown("""
@@ -1827,6 +2017,211 @@ def _run_screener_for_category(category_key: str, run_debate_flag: bool):
         st.code(traceback.format_exc())
 
 
+def _fmt_inr_sc(val):
+    """Quick INR formatter for scorecard."""
+    if val is None:
+        return "N/A"
+    if isinstance(val, (int, float)):
+        if abs(val) >= 1e12:
+            return f"{val/1e12:.1f}L Cr"
+        if abs(val) >= 1e7:
+            return f"{val/1e7:.1f} Cr"
+        if abs(val) >= 1e5:
+            return f"{val/1e5:.1f} L"
+        return f"{val:,.0f}"
+    return str(val)
+
+
+def _fmt_pct_sc(val):
+    """Format a ratio as percentage if small float."""
+    if val is None:
+        return "N/A"
+    if isinstance(val, float) and abs(val) < 10:
+        return f"{val:.1%}"
+    return f"{val:.2f}" if isinstance(val, float) else str(val)
+
+
+def render_stock_profile_scorecard(profile: dict):
+    """Render the stock profile scorecard with USP expanders (reusable helper)."""
+    info = profile.get("info", {})
+    research = profile.get("research_state", {})
+    company_name = info.get("longName", info.get("shortName", profile.get("ticker", "")))
+    inv_score = research.get("investment_score", {})
+
+    # ── Company header + recommendation badge ────────────────
+    rec = inv_score.get("recommendation", "")
+    rec_colors = {"STRONG BUY": "#00c853", "BUY": "#4caf50", "HOLD": "#ff9800", "SELL": "#f44336", "STRONG SELL": "#b71c1c"}
+    rec_color = rec_colors.get(rec, "#8892A0")
+    rec_badge = (
+        f'<span style="background:{rec_color}25; color:{rec_color}; padding:4px 12px; '
+        f'border-radius:6px; font-weight:700; font-size:0.85rem; margin-left:12px;">{rec}</span>'
+        if rec else ""
+    )
+    st.markdown(
+        f'<div style="margin-bottom:8px;">'
+        f'<span style="font-size:1.4rem; font-weight:800; color:#E8ECF1;">{company_name}</span>'
+        f'{rec_badge}'
+        f'<span style="color:#8892A0; font-size:0.85rem; margin-left:12px;">'
+        f'{info.get("sector", "")} | {info.get("industry", "")}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Company summary (business description) ───────────────
+    desc = info.get("longBusinessSummary", "")
+    if desc:
+        short_desc = desc[:200] + ("..." if len(desc) > 200 else "")
+        st.markdown(
+            f'<div style="background:rgba(26,31,46,0.6); border-left:3px solid #4DA6FF; '
+            f'border-radius:8px; padding:10px 16px; margin-bottom:12px; '
+            f'font-size:0.85rem; color:#B0B8C4; line-height:1.5;">{short_desc}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Top metric cards (Price, Market Cap, Score) ──────────
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        price = info.get("regularMarketPrice", "N/A")
+        render_metric_card("Price", f"INR {price}", accent="#00D4AA")
+    with c2:
+        mcap = info.get("marketCap")
+        mcap_display = f"{mcap/1e7:.0f} Cr" if mcap and mcap >= 1e7 else (f"{mcap:,.0f}" if mcap else "N/A")
+        render_metric_card("Market Cap", mcap_display, accent="#4DA6FF")
+    with c3:
+        comp_score = inv_score.get("composite_score", "N/A")
+        render_metric_card("Investment Score", f"{comp_score}/100", delta=rec, delta_up=True, accent="#00D4AA")
+    with c4:
+        geo = profile.get("geopolitical", {})
+        render_metric_card("Geo Risk", geo.get("risk_level", "N/A"),
+                           delta=f"{geo.get('overall_score', 'N/A')}/100", accent="#FFA726")
+    with c5:
+        lag = profile.get("smart_money_lag", 0)
+        lag_label = "Opportunity" if lag > 20 else "Neutral" if lag > -10 else "Crowded"
+        render_metric_card("Smart Money Lag", f"{lag}", delta=lag_label, delta_up=lag > 0, accent="#B388FF")
+
+    # ── Key Financials row ───────────────────────────────────
+    f1, f2, f3, f4 = st.columns(4)
+    with f1:
+        pe_t = info.get("trailingPE")
+        pe_f = info.get("forwardPE")
+        pe_delta = f"Fwd: {pe_f:.1f}" if pe_f else ""
+        render_metric_card("P/E Ratio", f"{pe_t:.1f}" if pe_t else "N/A", delta=pe_delta, accent="#4DA6FF")
+    with f2:
+        roe = info.get("returnOnEquity")
+        opm = info.get("operatingMargins")
+        opm_delta = f"OPM: {_fmt_pct_sc(opm)}" if opm else ""
+        render_metric_card("ROE", _fmt_pct_sc(roe), delta=opm_delta, delta_up=True, accent="#00D4AA")
+    with f3:
+        rev = info.get("totalRevenue")
+        rev_growth = info.get("revenueGrowth")
+        growth_delta = f"YoY: {_fmt_pct_sc(rev_growth)}" if rev_growth else ""
+        render_metric_card("Revenue", _fmt_inr_sc(rev), delta=growth_delta,
+                           delta_up=rev_growth and rev_growth > 0, accent="#B388FF")
+    with f4:
+        de = info.get("debtToEquity")
+        cr = info.get("currentRatio")
+        cr_delta = f"CR: {cr:.1f}" if cr else ""
+        render_metric_card("Debt/Equity", f"{de:.1f}" if de else "N/A", delta=cr_delta, accent="#FFA726")
+
+    # ── Quick Take (research report summary) ─────────────────
+    report = research.get("final_report", "")
+    if report:
+        lines = [l.strip() for l in report.split("\n")
+                 if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("---")]
+        quick_take = " ".join(lines)[:500]
+        if quick_take:
+            st.markdown(
+                f'<div style="background:rgba(0,212,170,0.05); border:1px solid rgba(0,212,170,0.2); '
+                f'border-radius:10px; padding:14px 18px; margin:8px 0 12px 0;">'
+                f'<div style="color:#00D4AA; font-weight:700; font-size:0.8rem; margin-bottom:6px; '
+                f'text-transform:uppercase; letter-spacing:0.05em;">Quick Take</div>'
+                f'<div style="color:#C8CED6; font-size:0.9rem; line-height:1.6;">{quick_take}...</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── USP Analysis (expanded by default) ───────────────────
+    with st.expander("USP Analysis Details", expanded=True):
+        ucol1, ucol2 = st.columns(2)
+        with ucol1:
+            st.markdown("**Geopolitical Risk**")
+            geo = profile.get("geopolitical", {})
+            st.write(f"- Trade Risk: {geo.get('trade_risk_score', 'N/A')}/100")
+            st.write(f"- Policy Risk: {geo.get('policy_risk_score', 'N/A')}/100")
+            st.write(f"- Commodity Risk: {geo.get('commodity_risk_score', 'N/A')}/100")
+            st.write(f"- Event Risk: {geo.get('event_risk_score', 'N/A')}/100")
+            st.markdown("**Management Credibility**")
+            cred = profile.get("credibility", {})
+            st.write(f"- Score: {cred.get('score', 'N/A')}/100 ({cred.get('method', '')})")
+            st.write(f"- {cred.get('reasoning', 'N/A')}")
+        with ucol2:
+            st.markdown("**Regulatory Environment**")
+            reg = profile.get("regulatory", {})
+            st.write(f"- Net Signal: {reg.get('net_signal', 'N/A')} (Score: {reg.get('score', 'N/A')})")
+            tailwinds = reg.get("tailwind_policies", [])
+            if tailwinds:
+                st.write(f"- Tailwinds: {', '.join(tailwinds)}")
+            headwinds = reg.get("headwind_policies", [])
+            if headwinds:
+                st.write(f"- Headwinds: {', '.join(headwinds)}")
+            st.markdown("**Promoter Behavior**")
+            buying = profile.get("promoter_buying", {})
+            st.write(f"- Signal: {buying.get('signal', 'N/A')}")
+            st.write(f"- Buys: {buying.get('buys', 0)} | Sells: {buying.get('sells', 0)}")
+            rpt = profile.get("related_party", {})
+            st.write(f"- RPT Anomaly: {'Yes' if rpt.get('has_anomaly') else 'No'}")
+
+    if inv_score and "dimension_scores" in inv_score:
+        with st.expander("Investment Score Breakdown", expanded=False):
+            render_investment_score(inv_score)
+
+
+def render_deep_dive_chat(profile: dict, messages_key: str, ticker_key: str):
+    """Render the deep dive chat interface (reusable helper).
+
+    Args:
+        profile: StockProfile dict.
+        messages_key: Session state key for chat messages list.
+        ticker_key: Session state key for ticker string.
+    """
+    info = profile.get("info", {})
+    company_name = info.get("longName", info.get("shortName", profile.get("ticker", "")))
+
+    st.divider()
+    st.markdown("### Ask Questions About This Stock")
+    st.caption("Examples: Products offered, revenue by segment, competitors, competitive edge, strengths, risks, red flags")
+
+    # Display chat history
+    messages = st.session_state.get(messages_key, [])
+    for msg in messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Chat input
+    if prompt := st.chat_input(f"Ask about {company_name}...", key=f"chat_input_{messages_key}"):
+        if messages_key not in st.session_state:
+            st.session_state[messages_key] = []
+        st.session_state[messages_key].append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing..."):
+                try:
+                    from app.deep_dive_chat import ask_stock_question
+                    response = ask_stock_question(
+                        prompt,
+                        profile,
+                        st.session_state[messages_key][:-1],
+                    )
+                    st.markdown(response)
+                    st.session_state[messages_key].append({"role": "assistant", "content": response})
+                except Exception as e:
+                    error_msg = f"Error generating response: {e}"
+                    st.error(error_msg)
+                    st.session_state[messages_key].append({"role": "assistant", "content": error_msg})
+
+
 def _render_regime_banner(cdata: dict):
     """Render the market regime banner."""
     regime = cdata.get("regime_data", {})
@@ -1863,8 +2258,26 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
             render_metric_card("Total Survivors", summary.get("total_survivors", "?"), accent="#00D4AA")
         st.divider()
 
-    # 3 Tabs: Results | USP | Debate
-    tab1, tab2, tab3 = st.tabs(["Screener Results", "USP Analysis", "AI Debate"])
+    # ── Extract stocks and bucket by tier (hoisted above tabs) ──
+    cat_results = cdata.get("category_results", {})
+    stocks = []
+    if isinstance(cat_results, dict):
+        stocks = cat_results.get(category_key, [])
+        if isinstance(stocks, dict):
+            stocks = stocks.get("stocks", [])
+    elif isinstance(cat_results, list):
+        for cr in cat_results:
+            if cr.get("category") == category_key:
+                stocks = cr.get("stocks", [])
+                break
+
+    tier_buckets: dict[str, list] = {t: [] for t in TIER_ORDER}
+    for s in stocks:
+        tier = s.get("tier", "failed")
+        tier_buckets.setdefault(tier, []).append(s)
+
+    # 4 Tabs: Results | USP | Debate | Deep Dive
+    tab1, tab2, tab3, tab4 = st.tabs(["Screener Results", "USP Analysis", "AI Debate", "Stock Deep Dive"])
 
     with tab1:
         # Criteria panel
@@ -1873,27 +2286,9 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
 
         st.divider()
 
-        # Stock results table
-        cat_results = cdata.get("category_results", {})
-        stocks = []
-        if isinstance(cat_results, dict):
-            stocks = cat_results.get(category_key, [])
-            if isinstance(stocks, dict):
-                stocks = stocks.get("stocks", [])
-        elif isinstance(cat_results, list):
-            for cr in cat_results:
-                if cr.get("category") == category_key:
-                    stocks = cr.get("stocks", [])
-                    break
-
         if stocks:
-            # Group stocks by tier
-            tier_buckets: dict[str, list] = {t: [] for t in TIER_ORDER}
-            for s in stocks:
-                tier = s.get("tier", "failed")
-                tier_buckets.setdefault(tier, []).append(s)
-
-            # Tier summary cards
+            # ── Tier category cards ──────────────────────────────
+            # Summary count cards
             tc1, tc2, tc3, tc4 = st.columns(4)
             with tc1:
                 render_metric_card("★ Buy Zone", len(tier_buckets.get("buy_zone", [])),
@@ -1910,7 +2305,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
 
             st.divider()
 
-            # Render each non-empty tier
+            # ── Expandable tier cards with stock details + action buttons ──
             for tier_key in TIER_ORDER:
                 tier_stocks = tier_buckets.get(tier_key, [])
                 if not tier_stocks:
@@ -1918,9 +2313,8 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
 
                 tc = TIER_CONFIG[tier_key]
                 is_failed = tier_key == "failed"
-                expanded = not is_failed
 
-                # Tier header
+                # Tier header card
                 st.markdown(
                     f'<div style="background:rgba(26,31,46,0.8); backdrop-filter:blur(10px); '
                     f'border-left:4px solid {tc["color"]}; border-radius:10px; '
@@ -1934,7 +2328,6 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                 )
 
                 if is_failed:
-                    # Failed: collapsed compact table
                     with st.expander(f"Show {len(tier_stocks)} failed stocks", expanded=False):
                         fail_rows = []
                         for s in tier_stocks[:50]:
@@ -1949,7 +2342,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                         st.dataframe(pd.DataFrame(fail_rows), use_container_width=True, hide_index=True)
                     continue
 
-                # Summary table for this tier
+                # Summary table
                 rows = []
                 for s in tier_stocks:
                     gate_cols = {}
@@ -1964,14 +2357,14 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     rows.append(row)
                 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-                # Per-stock expanders
+                # Per-stock expanders with criteria + action buttons
                 for s in tier_stocks[:30]:
                     score = s.get("score", 0)
                     active_total = s.get("active_total", "?")
                     gate_results = s.get("gate_results", [])
-                    tier_badge = f'{tc["icon"]} {tc["label"]}'
+                    sticker = s.get("ticker", "")
 
-                    with st.expander(f"{s['ticker']} — {score}/{active_total} | {s.get('sector', '')}"):
+                    with st.expander(f"{sticker} — {score}/{active_total} | {s.get('sector', '')}"):
                         # Near miss reason
                         if tier_key == "near_miss" and s.get("near_miss_reason"):
                             st.markdown(
@@ -2001,6 +2394,33 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                                 f'{checks}</div>',
                                 unsafe_allow_html=True,
                             )
+
+                        # ── Action buttons per stock ──
+                        st.markdown("")  # spacer
+                        btn1, btn2, _ = st.columns([1, 1, 2])
+                        with btn1:
+                            if st.button("Run AI Debate", key=f"debate_{category_key}_{tier_key}_{sticker}"):
+                                with st.spinner(f"Running debate for {sticker}..."):
+                                    try:
+                                        from app.agents.debate_hybrid import run_hybrid_debate
+                                        usp_cards_data = cdata.get("usp_cards", {})
+                                        cat_results_list = cdata.get("category_results", [])
+                                        if isinstance(cat_results_list, dict):
+                                            cat_results_list = [{"category": k, "stocks": v if isinstance(v, list) else v.get("stocks", [])}
+                                                                for k, v in cat_results_list.items()]
+                                        debate_result = run_hybrid_debate(sticker, usp_cards_data, cat_results_list)
+                                        if "debate_results" not in cdata:
+                                            cdata["debate_results"] = []
+                                        cdata["debate_results"].append(debate_result)
+                                        st.success(f"Debate complete for {sticker}! Check AI Debate tab.")
+                                    except Exception as e:
+                                        st.error(f"Debate failed: {e}")
+                        with btn2:
+                            if st.button("Deep Dive", key=f"dd_{category_key}_{tier_key}_{sticker}"):
+                                st.session_state.screener_dd_ticker = sticker
+                                st.session_state.screener_dd_profile = None
+                                st.session_state.screener_dd_messages = []
+                                st.info(f"Switch to **Stock Deep Dive** tab to load {sticker}.")
         else:
             st.info("No stocks found. Try running the screener.")
 
@@ -2067,6 +2487,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
         try:
             from app.ui.usp_cards import (
                 render_usp_heatmap, render_usp_card, render_usp_radar,
+                render_analyst_panel,
                 render_contradiction_alerts, transform_usp_data,
                 render_portfolio_insights,
             )
@@ -2100,11 +2521,12 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     key=lambda t: usp_cards[t].get("_composite", 0),
                     reverse=True,
                 ):
-                    c1, c2 = st.columns([2, 1])
+                    c1, c2 = st.columns([1, 1])
                     with c1:
                         render_usp_card(tkr, usp_cards[tkr])
                     with c2:
                         render_usp_radar(tkr, usp_cards[tkr])
+                        render_analyst_panel(tkr, usp_cards[tkr])
             else:
                 st.info("No USP data available. Run the screener first.")
         except Exception as e:
@@ -2204,12 +2626,77 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
         else:
             st.info("No debate results. Enable 'Run AI Debate' in the sidebar and run the screener.")
 
+    # Tab 4: Stock Deep Dive (auto-picks top stock from screener)
+    with tab4:
+        # Determine top stock from Buy Zone > Watchlist > Monitor
+        top_stock_ticker = None
+        for tk in ["buy_zone", "watchlist", "monitor"]:
+            bucket = tier_buckets.get(tk, [])
+            if bucket:
+                top_stock_ticker = bucket[0].get("ticker")
+                break
 
-# ── Momentum Screener Page ────────────────────────────────────
-if analysis_mode == "Momentum Screener":
+        if not top_stock_ticker:
+            st.info("No qualifying stocks for deep dive. Run the screener first.")
+        else:
+            # If user clicked "Deep Dive" on a specific stock, use that instead
+            if st.session_state.screener_dd_ticker:
+                top_stock_ticker = st.session_state.screener_dd_ticker
+
+            st.markdown(
+                f'<div style="background:rgba(26,31,46,0.8); border-left:4px solid #B388FF; '
+                f'border-radius:10px; padding:12px 20px; margin-bottom:16px;">'
+                f'<span style="font-size:1rem; font-weight:700; color:#B388FF;">Deep Dive Target: </span>'
+                f'<span style="font-size:1.1rem; font-weight:800; color:#E8ECF1;">{top_stock_ticker}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Allow switching to a different stock from screener results
+            all_tickers = [s.get("ticker") for s in stocks if s.get("ticker")]
+            if all_tickers:
+                selected = st.selectbox(
+                    "Select stock for deep dive",
+                    all_tickers,
+                    index=all_tickers.index(top_stock_ticker) if top_stock_ticker in all_tickers else 0,
+                    key=f"dd_select_{category_key}",
+                )
+                if selected != top_stock_ticker:
+                    top_stock_ticker = selected
+                    st.session_state.screener_dd_ticker = selected
+                    st.session_state.screener_dd_profile = None
+                    st.session_state.screener_dd_messages = []
+
+            # Load profile
+            dd_profile = st.session_state.screener_dd_profile
+            if dd_profile and st.session_state.screener_dd_ticker == top_stock_ticker:
+                render_stock_profile_scorecard(dd_profile)
+                render_deep_dive_chat(dd_profile, "screener_dd_messages", "screener_dd_ticker")
+            else:
+                if st.button(f"Load Deep Dive for {top_stock_ticker}", key=f"load_dd_{category_key}", type="primary"):
+                    progress = st.progress(0, text=f"Loading {top_stock_ticker} profile...")
+
+                    def _dd_prog(fraction: float, message: str):
+                        progress.progress(min(fraction, 1.0), text=message)
+
+                    try:
+                        from app.tools.stock_deep_dive import build_stock_profile
+                        profile = build_stock_profile(top_stock_ticker, "NSE", progress_cb=_dd_prog)
+                        st.session_state.screener_dd_profile = profile
+                        st.session_state.screener_dd_ticker = top_stock_ticker
+                        st.session_state.screener_dd_messages = []
+                        progress.empty()
+                        st.rerun()
+                    except Exception as e:
+                        progress.empty()
+                        st.error(f"Failed to load profile: {e}")
+
+
+# ── Trend Rider Page ────────────────────────────────────
+if analysis_mode == "Trend Rider":
     st.markdown(
         '<div class="section-hero" style="border-left:4px solid #00D4AA;">'
-        '<h3>Momentum Screener</h3>'
+        '<h3>Trend Rider</h3>'
         '<p>5 gates · 17 criteria · Strong stocks in strong sectors · RSI 55-75 · Volume confirmed</p>'
         '</div>', unsafe_allow_html=True,
     )
@@ -2221,18 +2708,18 @@ if analysis_mode == "Momentum Screener":
     if cdata and "Momentum" in (cdata.get("category_results") or {}):
         _render_screener_results(cdata, "Momentum", MOM_GATE_DISPLAY, "#00D4AA")
     else:
-        st.markdown("Click **Run Momentum Screener** in the sidebar to begin.")
+        st.markdown("Click **Run Trend Rider** in the sidebar to begin.")
         st.divider()
         st.markdown("#### Active Screening Criteria (5 Gates, 17 Criteria)")
         render_criteria_panel(MOM_GATE_DISPLAY, "#00D4AA")
 
     st.stop()
 
-# ── Value Screener Page ───────────────────────────────────────
-if analysis_mode == "Value Screener":
+# ── Turnaround Hunter Page ───────────────────────────────────────
+if analysis_mode == "Turnaround Hunter":
     st.markdown(
         '<div class="section-hero" style="border-left:4px solid #4DA6FF;">'
-        '<h3>Value Bottom Screener</h3>'
+        '<h3>Turnaround Hunter</h3>'
         '<p>Turnaround candidates at valuation floors · 28 criteria · RSI &lt;40 · F-Score ≥ 5</p>'
         '</div>', unsafe_allow_html=True,
     )
@@ -2244,7 +2731,7 @@ if analysis_mode == "Value Screener":
     if cdata and "ValueBottom" in (cdata.get("category_results") or {}):
         _render_screener_results(cdata, "ValueBottom", VAL_GATE_DISPLAY, "#4DA6FF")
     else:
-        st.markdown("Click **Run Value Screener** in the sidebar to begin.")
+        st.markdown("Click **Run Turnaround Hunter** in the sidebar to begin.")
         st.divider()
         st.markdown("#### Active Screening Criteria (7 Gates, 33 Criteria)")
         render_criteria_panel(VAL_GATE_DISPLAY, "#4DA6FF")
