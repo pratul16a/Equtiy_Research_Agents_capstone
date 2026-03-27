@@ -2158,49 +2158,117 @@ def render_stock_profile_scorecard(profile: dict):
                 unsafe_allow_html=True,
             )
 
-    # ── Research Summary (agent-derived insights) ────────────
+    # ── Research Insights (agent-derived + fallback from yfinance) ──
     dcf = research.get("dcf_valuation", {})
     sentiment = research.get("sentiment_scores", {})
     peers = research.get("peer_comparison", [])
     indian_m = research.get("indian_metrics", {})
-    has_research = dcf or sentiment or peers or indian_m
 
-    if has_research:
-        st.markdown(
-            '<div style="color:#E8ECF1; font-weight:700; font-size:0.85rem; margin:12px 0 8px 0; '
-            'text-transform:uppercase; letter-spacing:0.06em;">Research Insights <span style="color:#9AA2B0; '
-            'font-weight:400; font-size:0.75rem; text-transform:none;">(from AI agents)</span></div>',
-            unsafe_allow_html=True,
-        )
-        rc1, rc2, rc3, rc4 = st.columns(4)
-        with rc1:
-            if dcf and dcf.get("intrinsic_value"):
-                upside = dcf.get("upside_pct", "N/A")
-                up_color = "#00D4AA" if isinstance(upside, (int, float)) and upside > 0 else "#FF4757"
-                render_metric_card("DCF Value", f"INR {dcf['intrinsic_value']}", delta=f"Upside: {upside}%", delta_up=isinstance(upside, (int, float)) and upside > 0, accent=up_color)
+    # Fallback: compute DCF estimate from yfinance if agent didn't
+    if not dcf or not dcf.get("intrinsic_value"):
+        eps = info.get("trailingEps")
+        growth = info.get("earningsGrowth") or info.get("revenueGrowth")
+        price = info.get("regularMarketPrice")
+        if eps and eps > 0 and price:
+            # Simple Graham-style intrinsic value: EPS * (8.5 + 2g) where g = growth%
+            g_pct = (growth * 100) if growth else 10
+            intrinsic = eps * (8.5 + 2 * min(g_pct, 25))
+            upside_pct = round(((intrinsic - price) / price) * 100, 1)
+            dcf = {"intrinsic_value": round(intrinsic, 1), "upside_pct": upside_pct, "method": "Graham"}
+
+    # Fallback: derive sentiment from news count + price momentum
+    if not sentiment or (not sentiment.get("label") and not sentiment.get("overall_score")):
+        price_change = info.get("52WeekChange")
+        rec_key = info.get("recommendationKey", "")
+        if price_change is not None:
+            if price_change > 0.15:
+                sentiment = {"label": "Bullish", "overall_score": 70, "method": "price_momentum"}
+            elif price_change < -0.10:
+                sentiment = {"label": "Bearish", "overall_score": 30, "method": "price_momentum"}
             else:
-                render_metric_card("DCF Value", "N/A", accent="#8892A0")
-        with rc2:
-            s_label = sentiment.get("label", "")
-            s_score = sentiment.get("overall_score")
-            if s_label or (s_score is not None and s_score != 0):
-                display_label = s_label or ("Bullish" if s_score and s_score > 60 else "Bearish" if s_score and s_score < 40 else "Neutral")
-                s_colors = {"Bullish": "#00D4AA", "Bearish": "#FF4757", "Neutral": "#FFA726"}
-                render_metric_card("Sentiment", display_label, delta=f"Score: {s_score}" if s_score else "", accent=s_colors.get(display_label, "#9AA2B0"))
-            else:
-                render_metric_card("Sentiment", "Neutral", accent="#FFA726")
-        with rc3:
-            roce = indian_m.get("roce", {})
-            if roce:
-                render_metric_card("ROCE", f"{roce.get('roce_value', 'N/A')}", delta=roce.get("rating", ""), accent="#B388FF")
+                sentiment = {"label": "Neutral", "overall_score": 50, "method": "price_momentum"}
+        elif rec_key:
+            rec_map = {"strong_buy": ("Bullish", 80), "buy": ("Bullish", 70), "hold": ("Neutral", 50), "sell": ("Bearish", 30), "strong_sell": ("Bearish", 20)}
+            s_label, s_score = rec_map.get(rec_key, ("Neutral", 50))
+            sentiment = {"label": s_label, "overall_score": s_score, "method": "analyst_rec"}
+
+    # Fallback: compute ROCE from financials if agent didn't
+    if not indian_m.get("roce"):
+        fin_data = profile.get("financials_data", {})
+        fin_df = fin_data.get("financials")
+        bs_df = fin_data.get("balance_sheet")
+        if fin_df is not None and bs_df is not None:
+            try:
+                import pandas as pd
+                ebit = None
+                for row in ["EBIT", "Operating Income", "Operating Revenue"]:
+                    if row in fin_df.index:
+                        val = fin_df.loc[row].dropna()
+                        if len(val) > 0:
+                            ebit = float(val.iloc[0])
+                            break
+                total_assets = None
+                current_liab = None
+                for row in ["Total Assets"]:
+                    if row in bs_df.index:
+                        val = bs_df.loc[row].dropna()
+                        if len(val) > 0:
+                            total_assets = float(val.iloc[0])
+                for row in ["Current Liabilities", "Total Current Liabilities"]:
+                    if row in bs_df.index:
+                        val = bs_df.loc[row].dropna()
+                        if len(val) > 0:
+                            current_liab = float(val.iloc[0])
+                            break
+                if ebit and total_assets and current_liab and (total_assets - current_liab) > 0:
+                    roce_val = round((ebit / (total_assets - current_liab)) * 100, 1)
+                    rating = "Excellent" if roce_val > 20 else "Good" if roce_val > 12 else "Average" if roce_val > 8 else "Poor"
+                    indian_m = {"roce": {"roce_value": f"{roce_val}%", "rating": rating}, "_method": "computed"}
+            except Exception:
+                pass
+
+    st.markdown(
+        '<div style="color:#E8ECF1; font-weight:700; font-size:0.85rem; margin:12px 0 8px 0; '
+        'text-transform:uppercase; letter-spacing:0.06em;">Research Insights <span style="color:#9AA2B0; '
+        'font-weight:400; font-size:0.75rem; text-transform:none;">(from AI agents)</span></div>',
+        unsafe_allow_html=True,
+    )
+    rc1, rc2, rc3, rc4 = st.columns(4)
+    with rc1:
+        if dcf and dcf.get("intrinsic_value"):
+            upside = dcf.get("upside_pct", "N/A")
+            up_color = "#00D4AA" if isinstance(upside, (int, float)) and upside > 0 else "#FF4757"
+            method_tag = f" ({dcf['method']})" if dcf.get("method") else ""
+            render_metric_card("DCF Value", f"INR {dcf['intrinsic_value']}", delta=f"Upside: {upside}%{method_tag}", delta_up=isinstance(upside, (int, float)) and upside > 0, accent=up_color)
+        else:
+            render_metric_card("DCF Value", "N/A", accent="#8892A0")
+    with rc2:
+        s_label = sentiment.get("label", "")
+        s_score = sentiment.get("overall_score")
+        if s_label or (s_score is not None and s_score != 0):
+            display_label = s_label or ("Bullish" if s_score and s_score > 60 else "Bearish" if s_score and s_score < 40 else "Neutral")
+            s_colors = {"Bullish": "#00D4AA", "Bearish": "#FF4757", "Neutral": "#FFA726"}
+            render_metric_card("Sentiment", display_label, delta=f"Score: {s_score}" if s_score else "", accent=s_colors.get(display_label, "#9AA2B0"))
+        else:
+            render_metric_card("Sentiment", "Neutral", accent="#FFA726")
+    with rc3:
+        roce = indian_m.get("roce", {})
+        if roce:
+            render_metric_card("ROCE", f"{roce.get('roce_value', 'N/A')}", delta=roce.get("rating", ""), accent="#B388FF")
+        else:
+            roe = info.get("returnOnEquity")
+            if roe:
+                roe_pct = f"{roe*100:.1f}%"
+                rating = "Excellent" if roe > 0.20 else "Good" if roe > 0.12 else "Average"
+                render_metric_card("ROE", roe_pct, delta=rating, accent="#B388FF")
             else:
                 render_metric_card("ROCE", "N/A", accent="#8892A0")
-        with rc4:
-            if isinstance(peers, list) and peers:
-                peer_count = len(peers)
-                render_metric_card("Peers Compared", f"{peer_count} stocks", accent="#4DA6FF")
-            else:
-                render_metric_card("Peer Analysis", "N/A", accent="#8892A0")
+    with rc4:
+        if isinstance(peers, list) and peers:
+            peer_count = len(peers)
+            render_metric_card("Peers Compared", f"{peer_count} stocks", accent="#4DA6FF")
+        else:
+            render_metric_card("Peer Analysis", "N/A", accent="#8892A0")
 
     # ── USP Commentary (from screener data when available) ────
     screener_commentary = profile.get("screener_commentary", {})
@@ -2571,10 +2639,17 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                                         st.error(f"Debate failed: {e}")
                         with btn2:
                             if st.button("Deep Dive", key=f"dd_{category_key}_{tier_key}_{sticker}"):
-                                st.session_state.screener_dd_ticker = sticker
-                                st.session_state.screener_dd_profile = None
-                                st.session_state.screener_dd_messages = []
-                                st.info(f"Switch to **Stock Deep Dive** tab to load {sticker}.")
+                                with st.spinner(f"Loading {sticker} profile..."):
+                                    try:
+                                        from app.tools.stock_deep_dive import build_stock_profile
+                                        dd_prof = build_stock_profile(sticker, "NSE")
+                                        _inject_screener_context(dd_prof, sticker, cdata)
+                                        st.session_state.screener_dd_profile = dd_prof
+                                        st.session_state.screener_dd_ticker = sticker
+                                        st.session_state.screener_dd_messages = []
+                                        st.success(f"{sticker} loaded! Switch to **Stock Deep Dive** tab.")
+                                    except Exception as e:
+                                        st.error(f"Failed to load {sticker}: {e}")
         else:
             st.info("No stocks found. Try running the screener.")
 
