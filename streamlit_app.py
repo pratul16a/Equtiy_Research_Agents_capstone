@@ -297,7 +297,7 @@ with st.sidebar:
 
     analysis_mode = st.radio(
         "Mode",
-        ["Trend Rider", "Turnaround Hunter", "Stock Deep Dive"],
+        ["Trend Rider", "Turnaround Hunter", "Stock Deep Dive", "Multi Model Assessment"],
         key="analysis_mode_radio",
         label_visibility="collapsed",
     )
@@ -456,6 +456,10 @@ with st.sidebar:
                             st.session_state["dd_ticker_input"] = t
                             st.rerun()
 
+    elif analysis_mode == "Multi Model Assessment":
+        st.markdown('<span style="color:#FFD54F; font-size:11px; letter-spacing:0.1em; font-weight:700;">CROSS-MODEL VALIDATION</span>', unsafe_allow_html=True)
+        st.caption("Claude Opus 4 × GPT-5.2 consensus analysis")
+
     st.divider()
     st.caption("v4.0 · Free data sources · No paid APIs")
 
@@ -488,6 +492,8 @@ if "screener_dd_messages" not in st.session_state:
     st.session_state.screener_dd_messages = []
 if "screener_dd_ticker" not in st.session_state:
     st.session_state.screener_dd_ticker = ""
+if "_pending_dd_load" not in st.session_state:
+    st.session_state._pending_dd_load = None
 
 
 # ── Market Breadth Render Functions ──────────────────────────
@@ -2639,17 +2645,11 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                                         st.error(f"Debate failed: {e}")
                         with btn2:
                             if st.button("Deep Dive", key=f"dd_{category_key}_{tier_key}_{sticker}"):
-                                with st.spinner(f"Loading {sticker} profile..."):
-                                    try:
-                                        from app.tools.stock_deep_dive import build_stock_profile
-                                        dd_prof = build_stock_profile(sticker, "NSE")
-                                        _inject_screener_context(dd_prof, sticker, cdata)
-                                        st.session_state.screener_dd_profile = dd_prof
-                                        st.session_state.screener_dd_ticker = sticker
-                                        st.session_state.screener_dd_messages = []
-                                        st.success(f"{sticker} loaded! Switch to **Stock Deep Dive** tab.")
-                                    except Exception as e:
-                                        st.error(f"Failed to load {sticker}: {e}")
+                                st.session_state.screener_dd_ticker = sticker
+                                st.session_state.screener_dd_profile = None
+                                st.session_state.screener_dd_messages = []
+                                st.session_state._pending_dd_load = sticker
+                                st.toast(f"Loading {sticker}... switch to **Stock Deep Dive** tab.")
         else:
             st.info("No stocks found. Try running the screener.")
 
@@ -2896,13 +2896,18 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     st.session_state.screener_dd_profile = None
                     st.session_state.screener_dd_messages = []
 
+            # Auto-load if pending from per-stock button click
+            pending_dd = st.session_state.pop("_pending_dd_load", None)
+            auto_load = pending_dd == top_stock_ticker
+
             # Load profile
             dd_profile = st.session_state.screener_dd_profile
             if dd_profile and st.session_state.screener_dd_ticker == top_stock_ticker:
                 render_stock_profile_scorecard(dd_profile)
                 render_deep_dive_chat(dd_profile, "screener_dd_messages", "screener_dd_ticker")
             else:
-                if st.button(f"Load Deep Dive for {top_stock_ticker}", key=f"load_dd_{category_key}", type="primary"):
+                should_load = auto_load or st.button(f"Load Deep Dive for {top_stock_ticker}", key=f"load_dd_{category_key}", type="primary")
+                if should_load:
                     progress = st.progress(0, text=f"Loading {top_stock_ticker} profile...")
 
                     def _dd_prog(fraction: float, message: str):
@@ -3011,6 +3016,30 @@ if analysis_mode == "Market Breadth":
         """)
 
     st.stop()  # Don't render stock analysis UI below
+
+# ── Multi Model Assessment Page ─────────────────────────────
+if analysis_mode == "Multi Model Assessment":
+    mma_tab1, mma_tab2 = st.tabs(["Multi Model Assessment", "Screener Transition Analysis"])
+
+    with mma_tab1:
+        html_path = os.path.join(os.path.dirname(__file__), "data", "multi_model_assessment.html")
+        if os.path.exists(html_path):
+            with open(html_path, "r", encoding="utf-8") as f:
+                html_content = f.read()
+            st.components.v1.html(html_content, height=2400, scrolling=True)
+        else:
+            st.warning("Multi Model Assessment HTML file not found at `data/multi_model_assessment.html`.")
+
+    with mma_tab2:
+        trans_path = os.path.join(os.path.dirname(__file__), "data", "screener_transition_analysis.html")
+        if os.path.exists(trans_path):
+            with open(trans_path, "r", encoding="utf-8") as f:
+                trans_content = f.read()
+            st.components.v1.html(trans_content, height=2400, scrolling=True)
+        else:
+            st.warning("Screener Transition Analysis HTML file not found at `data/screener_transition_analysis.html`.")
+
+    st.stop()
 
 # Handle button actions
 if run_full:
