@@ -13,8 +13,8 @@ import time as _time
 
 logger = logging.getLogger(__name__)
 
-_INFO_TTL = 14400  # 4 hour cache for screening data (survives restarts via disk cache)
-_FINANCIALS_TTL = 14400
+_INFO_TTL = 43200  # 12 hours (demo mode — normally 14400)
+_FINANCIALS_TTL = 43200
 
 
 @retry_on_error(max_retries=1, base_delay=1.0)

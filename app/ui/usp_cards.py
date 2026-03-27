@@ -364,7 +364,7 @@ def render_analyst_panel(ticker: str, usp_data: dict[str, Any]) -> None:
         st.markdown(
             f'<div style="background:linear-gradient(135deg, #1a2332 0%, #0E1117 100%); '
             f'border:1px solid #00D4AA; border-radius:8px; padding:14px 16px; margin-bottom:12px;">'
-            f'<div style="color:#00D4AA; font-size:0.75em; font-weight:700; '
+            f'<div style="color:#00D4AA; font-size:0.78em; font-weight:700; '
             f'text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Investment Thesis</div>'
             f'<div style="color:#E8E8E8; font-size:0.9em; line-height:1.6;">{thesis}</div>'
             f'</div>',
@@ -382,7 +382,7 @@ def render_analyst_panel(ticker: str, usp_data: dict[str, Any]) -> None:
         )
         st.markdown(
             f'<div style="background:#111820; border-radius:6px; padding:10px 14px; margin-bottom:10px;">'
-            f'<div style="color:#00D4AA; font-size:0.72em; font-weight:700; '
+            f'<div style="color:#00D4AA; font-size:0.78em; font-weight:700; '
             f'text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Key Catalysts</div>'
             f'{catalyst_html}</div>',
             unsafe_allow_html=True,
@@ -399,7 +399,7 @@ def render_analyst_panel(ticker: str, usp_data: dict[str, Any]) -> None:
         )
         st.markdown(
             f'<div style="background:#111820; border-radius:6px; padding:10px 14px; margin-bottom:10px;">'
-            f'<div style="color:#FF4757; font-size:0.72em; font-weight:700; '
+            f'<div style="color:#FF4757; font-size:0.78em; font-weight:700; '
             f'text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Key Risks</div>'
             f'{risk_html}</div>',
             unsafe_allow_html=True,
@@ -411,7 +411,7 @@ def render_analyst_panel(ticker: str, usp_data: dict[str, Any]) -> None:
         st.markdown(
             f'<div style="background:#1a1a2e; border:1px solid #B388FF; border-radius:6px; '
             f'padding:10px 14px; margin-bottom:10px;">'
-            f'<div style="color:#B388FF; font-size:0.72em; font-weight:700; '
+            f'<div style="color:#B388FF; font-size:0.78em; font-weight:700; '
             f'text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">What to Watch</div>'
             f'<div style="color:#D0D0D0; font-size:0.85em; line-height:1.5;">👁 {watch}</div>'
             f'</div>',

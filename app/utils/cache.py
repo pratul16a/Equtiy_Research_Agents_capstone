@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 _cache: dict[str, tuple[float, Any]] = {}
 _cache_lock = Lock()
 
-DEFAULT_TTL = 300  # 5 minutes
+DEFAULT_TTL = 3600  # 1 hour (demo mode — normally 300)
 
 
 def cache_get(key: str) -> Any | None:
@@ -142,7 +142,7 @@ def retry_on_error(
 
 # ── SQLite Disk Cache ────────────────────────────────────────
 
-DISK_CACHE_TTL = 14400  # 4 hours — survives process restarts
+DISK_CACHE_TTL = 43200  # 12 hours (demo mode — normally 14400)
 _DISK_CACHE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "data", "cache.db",

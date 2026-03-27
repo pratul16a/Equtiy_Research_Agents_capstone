@@ -29,10 +29,12 @@ _THESIS_PATTERNS = re.compile(
     r"outlook|recommendation|target price|worth buying|accumulate|avoid)\b", re.I
 )
 _ANALYSIS_PATTERNS = re.compile(
-    r"\b(why|how has|compare|trend|risk|red flag|competitor|moat|growth driver|"
-    r"margin pressure|debt concern|peer|valuation expensive|undervalued|overvalued|"
-    r"what are the risks|what are the strengths|weakness|opportunity|threat|swot|"
-    r"explain|analyze|analysis|assess|evaluate|implications|impact|concern)\b", re.I
+    r"\b(why|how has|compare|trend|risk|red flag|competitor|competition|competitive|"
+    r"moat|growth driver|margin pressure|debt concern|peer|valuation expensive|"
+    r"undervalued|overvalued|what are the risks|what are the strengths|weakness|"
+    r"opportunity|threat|swot|explain|analyze|analysis|assess|evaluate|implications|"
+    r"impact|concern|strength|advantage|market share|positioning|landscape|segment|"
+    r"product|revenue breakdown|business model|catalyst|driver|headwind|tailwind)\b", re.I
 )
 
 
@@ -74,12 +76,14 @@ Answer in **1-3 sentences**. Cite the exact number(s) the user is asking about. 
 ANALYSIS_PROMPT = _BASE_RULES + """
 
 ## Response style
-Provide focused analysis in **200-400 words**. Cover only the specific topic asked. Use markdown headings sparingly (one ### at most). Include relevant numbers and peer context where available.
+Provide focused analysis in **300-500 words**. Cover only the specific topic asked. Use markdown headings sparingly (one ### at most). Include relevant numbers and peer context where available.
 
 **Topic-specific guidance:**
 - For competitor/peer questions: compare key metrics (P/E, margins, growth, market cap), discuss competitive advantages (brand, scale, cost leadership, network effects, moat), and market positioning.
 - For risk questions: cross-reference governance, debt, promoter pledge, geopolitical exposure. Rate severity.
 - For growth questions: cite YoY trends, segment drivers, and forward guidance.
+
+If SCREENER DATA or SCREENING ANALYSIS sections are available, use them to ground your answer with specific numbers, trends, and evidence. Cite quarterly figures, balance sheet items, and screening criteria results when relevant.
 
 === STOCK DATA ===
 {stock_context}
@@ -88,11 +92,13 @@ Provide focused analysis in **200-400 words**. Cover only the specific topic ask
 THESIS_PROMPT = _BASE_RULES + """
 
 ## Response style
-Provide comprehensive analysis in **300-500 words**. Structure with clear sections:
+Provide comprehensive analysis in **500-800 words**. Structure with clear sections:
 - Bull case (with numbers)
 - Bear case / risks
 - Valuation view
 - Your weighted verdict
+
+Use all available data including screening analysis, USP dimensions, and financial tables to build a comprehensive thesis. Reference specific catalysts, risks, and metrics from the screening data.
 
 === STOCK DATA ===
 {stock_context}
@@ -105,9 +111,9 @@ _PROMPT_MAP = {
 }
 
 _MAX_TOKENS_MAP = {
-    "factual": 400,
-    "analysis": 1000,
-    "thesis": 1200,
+    "factual": 600,
+    "analysis": 1500,
+    "thesis": 2000,
 }
 
 # ---------------------------------------------------------------------------
@@ -492,43 +498,109 @@ def serialize_stock_context(profile: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# RAG + Screener context helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_rag_context(ticker: str, question: str, k: int = 4) -> str:
+    """Fetch relevant RAG chunks from the FAISS index for the question."""
+    try:
+        from app.rag.retriever import search_by_symbol
+        clean_ticker = ticker.replace(".NS", "").replace(".BO", "")
+        results = search_by_symbol(query=question, symbol=clean_ticker, k=k)
+        if not results:
+            return ""
+        sections = ["\n## SCREENER DATA (from Screener.in)"]
+        for r in results:
+            section = r.get("metadata", {}).get("section", "")
+            content = r["content"][:500]
+            sections.append(f"[{section}] {content}")
+        return "\n".join(sections)
+    except Exception as e:
+        logger.debug("RAG retrieval failed for %s: %s", ticker, e)
+        return ""
+
+
+def _build_screener_insights(profile: dict) -> str:
+    """Build context from screener USP commentary and tier data."""
+    usp = profile.get("screener_usp", {})
+    commentary = profile.get("screener_commentary", {})
+    tier = profile.get("screener_tier", "")
+    score = profile.get("screener_score", "")
+
+    if not usp and not commentary and not tier:
+        return ""
+
+    sections = ["\n## SCREENING ANALYSIS"]
+    if tier:
+        sections.append(f"Screener Tier: {tier} (Score: {score})")
+    if commentary.get("investment_thesis"):
+        sections.append(f"Investment Thesis: {commentary['investment_thesis']}")
+    if commentary.get("key_catalysts"):
+        cats = commentary["key_catalysts"]
+        sections.append(f"Key Catalysts: {', '.join(cats) if isinstance(cats, list) else cats}")
+    if commentary.get("key_risks"):
+        risks = commentary["key_risks"]
+        sections.append(f"Key Risks: {', '.join(risks) if isinstance(risks, list) else risks}")
+    if commentary.get("what_to_watch"):
+        watch = commentary["what_to_watch"]
+        sections.append(f"What to Watch: {', '.join(watch) if isinstance(watch, list) else watch}")
+
+    # USP dimension summaries
+    for dim in ["geopolitical", "smart_money", "regulatory", "mgmt_credibility", "promoter"]:
+        dim_data = usp.get(dim, {})
+        if dim_data:
+            dim_score = dim_data.get("score", dim_data.get("_composite", "N/A"))
+            level = dim_data.get("level", "")
+            sections.append(f"{dim}: {dim_score}/100 ({level})" if level else f"{dim}: {dim_score}/100")
+
+    return "\n".join(sections)
+
+
+# ---------------------------------------------------------------------------
 # Question-aware context filter
 # ---------------------------------------------------------------------------
 
-def filter_context_for_question(profile: dict, q_type: str) -> str:
+def filter_context_for_question(profile: dict, q_type: str, question: str = "") -> str:
     """Return only sections relevant to the question type.
 
-    factual  -> overview + ratios only (~500 tokens)
-    analysis -> overview + financials(summary) + valuation + relevant risk (~2K tokens)
-    thesis   -> everything with summarized tables (~3K tokens)
+    factual  -> overview + ratios only (~500 tokens) — no RAG (fast)
+    analysis -> overview + financials(summary) + valuation + risk + sentiment
+               + screener insights + RAG(k=4) — 300-500 words
+    thesis   -> everything + screener insights + RAG(k=6) — 500-800 words
     """
+    ticker = profile.get("ticker", "")
+    screener_context = _build_screener_insights(profile)
+
     if q_type == "factual":
         parts = [
             _build_overview(profile),
-            _build_score(profile),
         ]
     elif q_type == "analysis":
-        # Include report snippet for richer context (competitive landscape, etc.)
         report_snippet = _build_report(profile)
         if len(report_snippet) > 2000:
             report_snippet = report_snippet[:2000] + "\n[...truncated]"
+        rag_context = _get_rag_context(ticker, question, k=4) if ticker and question else ""
         parts = [
             _build_overview(profile),
             _build_financials(profile, summarize=True),
             _build_valuation(profile),
             _build_risk_governance(profile),
             _build_sentiment(profile),
-            _build_score(profile),
+            screener_context,
+            rag_context,
             report_snippet,
         ]
     else:  # thesis
+        rag_context = _get_rag_context(ticker, question, k=6) if ticker and question else ""
         parts = [
             _build_overview(profile),
             _build_financials(profile, summarize=True),
             _build_valuation(profile),
             _build_risk_governance(profile),
             _build_sentiment(profile),
-            _build_score(profile),
+            screener_context,
+            rag_context,
             _build_report(profile),
         ]
     return "\n".join(p for p in parts if p)
@@ -556,9 +628,9 @@ def ask_stock_question(
     company_name = info.get("longName", info.get("shortName", profile.get("ticker", "Unknown")))
     ticker = profile.get("ticker", "Unknown")
 
-    # Classify and filter
+    # Classify and filter (pass question for RAG retrieval on analysis/thesis)
     q_type = classify_question(question)
-    context = filter_context_for_question(profile, q_type)
+    context = filter_context_for_question(profile, q_type, question=question)
     max_tokens = _MAX_TOKENS_MAP[q_type]
 
     # Build system prompt

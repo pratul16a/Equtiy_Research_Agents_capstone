@@ -12,7 +12,7 @@ from datetime import datetime
 
 # ── Page Config ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="AlphaLens",
+    page_title="AlphaLens — Indian Equity Research",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -22,21 +22,24 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* ── Global dark overrides ─────────────────── */
-    .stApp { background-color: #0E1117; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    .stApp { background-color: #0E1117; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    .stMarkdown, .stText, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
     section[data-testid="stSidebar"] { background-color: #0D1117; border-right: 1px solid #1E2A3A; }
     .stTabs [data-baseweb="tab-list"] { background-color: #1A1F2E; border-radius: 8px; padding: 4px; gap: 4px; }
-    .stTabs [data-baseweb="tab"] { background-color: transparent; color: #8892A0; border-radius: 6px; }
-    .stTabs [aria-selected="true"] { background-color: #232A3B !important; color: #00D4AA !important; }
+    .stTabs [data-baseweb="tab"] { background-color: transparent; color: #9AA2B0; border-radius: 6px; font-size: 14px; font-we
+            ight: 500; padding: 8px 16px; }
+    .stTabs [aria-selected="true"] { background-color: #232A3B !important; color: #00D4AA !important; font-weight: 700; }
     hr { border-color: #1E2A3A !important; }
 
     /* DataFrames */
-    [data-testid="stDataFrame"] th { background-color: #1A1F2E !important; color: #8892A0 !important; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-    [data-testid="stDataFrame"] td { background-color: #0E1117 !important; color: #E0E0E0 !important; border-bottom: 1px solid #1E2A3A !important; }
+    [data-testid="stDataFrame"] th { background-color: #1A1F2E !important; color: #A0A8B4 !important; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; padding: 10px 12px !important; }
+    [data-testid="stDataFrame"] td { background-color: #0E1117 !important; color: #E0E0E0 !important; border-bottom: 1px solid #1E2A3A !important; padding: 8px 12px !important; font-size: 13px; }
 
     /* Expanders */
-    .streamlit-expanderHeader { background-color: #1A1F2E !important; border: 1px solid #2D3748; border-radius: 8px; color: #E8ECF1 !important; }
-    .streamlit-expanderContent { background-color: #141922 !important; border: 1px solid #2D3748; border-top: none; }
-    details[data-testid="stExpander"] > summary { background-color: #1A1F2E !important; border-radius: 8px; }
+    .streamlit-expanderHeader { background-color: #1A1F2E !important; border: 1px solid #2D3748; border-radius: 8px; color: #E8ECF1 !important; padding: 12px 16px !important; }
+    .streamlit-expanderContent { background-color: #141922 !important; border: 1px solid #2D3748; border-top: none; padding: 12px 16px !important; }
+    details[data-testid="stExpander"] > summary { background-color: #1A1F2E !important; border-radius: 8px; padding: 12px 16px !important; }
 
     /* Buttons */
     .stButton > button[kind="primary"] { background: linear-gradient(135deg, #00D4AA, #00B894) !important; color: #0E1117 !important; font-weight: 700; border: none !important; border-radius: 8px; }
@@ -76,11 +79,11 @@ st.markdown("""
         transform: translateY(-2px);
     }
     .metric-card .mc-label {
-        font-size: 11px; text-transform: uppercase;
-        letter-spacing: 0.08em; color: #8892A0; margin-bottom: 6px;
+        font-size: 12px; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #9AA2B0; margin-bottom: 8px;
     }
-    .metric-card .mc-value { font-size: 1.8rem; font-weight: 700; color: #E8ECF1; }
-    .metric-card .mc-delta { font-size: 0.85rem; margin-top: 4px; }
+    .metric-card .mc-value { font-size: 1.5rem; font-weight: 700; color: #E8ECF1; line-height: 1.2; }
+    .metric-card .mc-delta { font-size: 0.82rem; margin-top: 6px; }
     .mc-delta-up { color: #00D4AA; }
     .mc-delta-down { color: #FF4757; }
 
@@ -90,8 +93,8 @@ st.markdown("""
         border: 1px solid #1E2A3A; border-radius: 12px;
         padding: 24px 28px; margin-bottom: 24px;
     }
-    .section-hero h3 { color: #E8ECF1; margin: 0 0 4px 0; font-size: 1.5rem; font-weight: 800; }
-    .section-hero p { color: #8892A0; font-size: 0.9rem; margin: 0; }
+    .section-hero h3 { color: #E8ECF1; margin: 0 0 6px 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
+    .section-hero p { color: #9AA2B0; font-size: 0.9rem; margin: 0; line-height: 1.5; }
 
     /* Criteria */
     .criteria-group { background: rgba(26, 31, 46, 0.6); border: 1px solid #2D3748; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
@@ -136,9 +139,11 @@ st.markdown("""
   <line x1="73" y1="67" x2="93" y2="87" stroke="#0D9488" stroke-width="3" stroke-linecap="round"/>
   <polyline points="25,57 35,49 45,53 55,37 65,41" fill="none" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="55" cy="37" r="3" fill="#14B8A6"/>
-  <text x="110" y="40" style="font-family: Calibri, Arial, sans-serif; font-size: 30px; font-weight: 600; fill: #1E293B;">Alpha</text>
-  <text x="110" y="68" style="font-family: Calibri, Arial, sans-serif; font-size: 30px; font-weight: 400; fill: #0D9488;">Lens</text>
+  <text x="110" y="40" style="font-family: Inter, -apple-system, sans-serif; font-size: 34px; font-weight: 800; fill: #E8ECF1; letter-spacing: -0.5px;">Alpha</text>
+  <text x="110" y="70" style="font-family: Inter, -apple-system, sans-serif; font-size: 34px; font-weight: 400; fill: #14B8A6; letter-spacing: 1px;">Lens</text>
 </svg>
+<div style="color:#9AA2B0; font-size:0.82rem; letter-spacing:0.08em; margin-top:2px; font-style:italic;">
+Screen like an Institution. Explain like an Analyst.</div>
 """, unsafe_allow_html=True)
 
 
@@ -276,21 +281,25 @@ def safe_get(data, key, default="N/A"):
 # ── Sidebar ──────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(
-        '<div style="text-align:center; padding:16px 0 8px;">'
-        '<span style="font-size:1.6rem; font-weight:800; letter-spacing:0.15em; '
-        'background:linear-gradient(135deg,#00D4AA,#4DA6FF); '
-        '-webkit-background-clip:text; -webkit-text-fill-color:transparent;">'
-        'ALPHA TERMINAL</span>'
-        '<div style="font-size:10px; letter-spacing:0.2em; color:#8892A0; margin-top:2px;">'
-        'NIFTY 500 INTELLIGENCE</div></div>',
+        '<div style="text-align:center; padding:16px 0 8px; font-size:10.5px; font-weight:700; '
+        'letter-spacing:0.08em; text-transform:uppercase; line-height:2.2;">'
+        '<span style="color:#00D4AA;">Gated Screening</span>'
+        ' <span style="color:#2D3748;">·</span> '
+        '<span style="color:#FFA726;">Premium Indicators</span>'
+        '<br/>'
+        '<span style="color:#4DA6FF;">AI Debate</span>'
+        ' <span style="color:#2D3748;">·</span> '
+        '<span style="color:#B388FF;">Deep Dive</span>'
+        '</div>',
         unsafe_allow_html=True,
     )
     st.divider()
 
     analysis_mode = st.radio(
-        "Navigation",
-        ["Command Center", "Market Breadth", "Trend Rider", "Turnaround Hunter", "Stock Diagnostic", "Stock Deep Dive"],
+        "Mode",
+        ["Trend Rider", "Turnaround Hunter", "Stock Deep Dive"],
         key="analysis_mode_radio",
+        label_visibility="collapsed",
     )
 
     test_mode = st.checkbox("Test Mode (50 stocks)", value=True, help="Limit to 50 stocks for faster testing")
@@ -314,13 +323,7 @@ with st.sidebar:
     ticker = ""
     exchange = "NSE"
 
-    if analysis_mode == "Market Breadth":
-        st.markdown('<span style="color:#4DA6FF; font-size:11px; letter-spacing:0.1em; font-weight:700;">BREADTH CONTROLS</span>', unsafe_allow_html=True)
-        st.caption("Sector RS, 52W breadth, and top outperformers across Nifty 500.")
-        run_breadth = st.button("Run Breadth Analysis", type="primary", use_container_width=True)
-        st.caption("Fetches data for ~500 stocks. First run ~45-60s. Cached for 10 min.")
-
-    elif analysis_mode == "Trend Rider":
+    if analysis_mode == "Trend Rider":
         st.markdown('<span style="color:#00D4AA; font-size:11px; letter-spacing:0.1em; font-weight:700;">MOMENTUM CONTROLS</span>', unsafe_allow_html=True)
         st.caption("5 gates · 17 criteria · Strong stocks in strong sectors")
         run_momentum = st.button("Run Trend Rider", type="primary", use_container_width=True)
@@ -414,24 +417,6 @@ with st.sidebar:
             run_value = True
             st.session_state["_run_both"] = True
 
-    elif analysis_mode == "Stock Diagnostic":
-        st.markdown('<span style="color:#FFA726; font-size:11px; letter-spacing:0.1em; font-weight:700;">SINGLE STOCK TEST</span>', unsafe_allow_html=True)
-        st.caption("Run ALL screening criteria on one stock. See exactly what passes and fails.")
-        diag_ticker = st.text_input(
-            "Ticker",
-            value="ZAGGLE.NS",
-            max_chars=20,
-            help="Enter BSE/NSE ticker (e.g., ZAGGLE.NS, ALKEM.NS)",
-            key="diag_ticker_input",
-        )
-        diag_exchange = st.selectbox("Exchange", ["NSE", "BSE"], index=0, key="diag_exchange")
-        diag_ticker = diag_ticker.strip().upper()
-        if diag_exchange == "NSE" and not diag_ticker.endswith(".NS"):
-            diag_ticker = f"{diag_ticker}.NS"
-        elif diag_exchange == "BSE" and not diag_ticker.endswith(".BO"):
-            diag_ticker = f"{diag_ticker}.BO"
-        run_diagnostic = st.button("Run Diagnostic", type="primary", use_container_width=True)
-
     elif analysis_mode == "Stock Deep Dive":
         st.markdown('<span style="color:#B388FF; font-size:11px; letter-spacing:0.1em; font-weight:700;">STOCK TICKER</span>', unsafe_allow_html=True)
         dd_ticker = st.text_input(
@@ -472,9 +457,7 @@ with st.sidebar:
                             st.rerun()
 
     st.divider()
-    st.caption("Built with Streamlit + Claude Code")
-    st.caption("Data: yfinance &middot; BSE &middot; Google News")
-    st.caption("Cache TTL: 10 minutes")
+    st.caption("v4.0 · Free data sources · No paid APIs")
 
 
 # ── Session State Init ───────────────────────────────────────
@@ -1422,8 +1405,6 @@ def run_full_pipeline(ticker_val: str):
 
 
 # ── Main Content ─────────────────────────────────────────────
-st.markdown('<p class="main-header">AlphaLens</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Deep Dive + Debate Command Center</p>', unsafe_allow_html=True)
 st.divider()
 
 # ── Command Center Mode ─────────────────────────────────────
@@ -1876,9 +1857,14 @@ if analysis_mode == "Stock Deep Dive":
 
         try:
             from app.tools.stock_deep_dive import build_stock_profile
-            st.session_state.deep_dive_profile = build_stock_profile(
+            profile = build_stock_profile(
                 ticker, exchange, progress_cb=_dd_progress,
             )
+            # Bridge screener data if a screener run has been done
+            cdata = st.session_state.get("category_screener_data")
+            if cdata:
+                _inject_screener_context(profile, ticker, cdata)
+            st.session_state.deep_dive_profile = profile
             st.session_state.deep_dive_ticker = ticker
             progress_bar.empty()
             st.success("Stock profile loaded!")
@@ -1982,6 +1968,32 @@ def _run_screener_for_category(category_key: str, run_debate_flag: bool):
                 top_tickers = _select_top_stocks(usp_cards, cat_list, max_stocks=MAX_DEBATE_STOCKS)
                 debate_results = []
 
+                # Preload deep dive profile for #1 stock in parallel with debate
+                dd_thread = None
+                if top_tickers:
+                    import threading
+
+                    def _preload_deep_dive(t_ticker, cdata_snapshot):
+                        try:
+                            from app.tools.stock_deep_dive import build_stock_profile
+                            dd_prof = build_stock_profile(t_ticker, "NSE")
+                            _inject_screener_context(dd_prof, t_ticker, cdata_snapshot)
+                            # Store in a thread-safe attribute (Streamlit session_state
+                            # is not thread-safe, so we stash on the function object)
+                            _preload_deep_dive._result = dd_prof
+                            _preload_deep_dive._ticker = t_ticker
+                        except Exception:
+                            _preload_deep_dive._result = None
+
+                    _preload_deep_dive._result = None
+                    _preload_deep_dive._ticker = None
+                    dd_thread = threading.Thread(
+                        target=_preload_deep_dive,
+                        args=(top_tickers[0], {**result, "usp_cards": usp_cards}),
+                        daemon=True,
+                    )
+                    dd_thread.start()
+
                 if use_deep:
                     from app.agents.debate_agents import run_debate as _run_debate_fn
                     for t in top_tickers:
@@ -1996,6 +2008,14 @@ def _run_screener_for_category(category_key: str, run_debate_flag: bool):
                 result["debate_results"] = debate_results
                 result["usp_cards"] = usp_cards
                 st.session_state.category_screener_data = result
+
+                # Collect preloaded deep dive profile
+                if dd_thread is not None:
+                    dd_thread.join(timeout=120)
+                    if _preload_deep_dive._result is not None:
+                        st.session_state.screener_dd_profile = _preload_deep_dive._result
+                        st.session_state.screener_dd_ticker = _preload_deep_dive._ticker
+                        st.session_state.screener_dd_messages = []
             except Exception as e:
                 st.warning(f"Debate phase failed (non-fatal): {e}")
             _timings["debate"] = _time.time() - _t_debate
@@ -2048,21 +2068,24 @@ def render_stock_profile_scorecard(profile: dict):
     company_name = info.get("longName", info.get("shortName", profile.get("ticker", "")))
     inv_score = research.get("investment_score", {})
 
-    # ── Company header + recommendation badge ────────────────
-    rec = inv_score.get("recommendation", "")
-    rec_colors = {"STRONG BUY": "#00c853", "BUY": "#4caf50", "HOLD": "#ff9800", "SELL": "#f44336", "STRONG SELL": "#b71c1c"}
-    rec_color = rec_colors.get(rec, "#8892A0")
-    rec_badge = (
-        f'<span style="background:{rec_color}25; color:{rec_color}; padding:4px 12px; '
-        f'border-radius:6px; font-weight:700; font-size:0.85rem; margin-left:12px;">{rec}</span>'
-        if rec else ""
+    # ── Company header (no recommendation badge — screener tier used instead) ──
+    # Show screener tier badge if available from screener pipeline
+    tier = profile.get("screener_tier", "")
+    tier_colors = {"Buy Zone": "#00c853", "Watchlist": "#4DA6FF", "Monitor": "#FFA726", "Near Miss": "#B388FF"}
+    tier_color = tier_colors.get(tier, "#8892A0")
+    tier_badge = (
+        f'<span style="background:{tier_color}25; color:{tier_color}; padding:4px 12px; '
+        f'border-radius:6px; font-weight:700; font-size:0.85rem; margin-left:12px;">{tier}</span>'
+        if tier else ""
     )
     st.markdown(
-        f'<div style="margin-bottom:8px;">'
-        f'<span style="font-size:1.4rem; font-weight:800; color:#E8ECF1;">{company_name}</span>'
-        f'{rec_badge}'
-        f'<span style="color:#8892A0; font-size:0.85rem; margin-left:12px;">'
-        f'{info.get("sector", "")} | {info.get("industry", "")}</span>'
+        f'<div style="margin-bottom:12px;">'
+        f'<div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">'
+        f'<span style="font-size:1.5rem; font-weight:800; color:#E8ECF1; letter-spacing:-0.01em;">{company_name}</span>'
+        f'{tier_badge}'
+        f'</div>'
+        f'<div style="color:#9AA2B0; font-size:0.85rem; margin-top:4px;">'
+        f'{info.get("sector", "")} · {info.get("industry", "")}</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -2074,12 +2097,12 @@ def render_stock_profile_scorecard(profile: dict):
         st.markdown(
             f'<div style="background:rgba(26,31,46,0.6); border-left:3px solid #4DA6FF; '
             f'border-radius:8px; padding:10px 16px; margin-bottom:12px; '
-            f'font-size:0.85rem; color:#B0B8C4; line-height:1.5;">{short_desc}</div>',
+            f'font-size:0.88rem; color:#B0B8C4; line-height:1.6;">{short_desc}</div>',
             unsafe_allow_html=True,
         )
 
-    # ── Top metric cards (Price, Market Cap, Score) ──────────
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # ── Top metric cards (Price, Market Cap, Screener Tier) ──
+    c1, c2, c3 = st.columns(3)
     with c1:
         price = info.get("regularMarketPrice", "N/A")
         render_metric_card("Price", f"INR {price}", accent="#00D4AA")
@@ -2088,16 +2111,11 @@ def render_stock_profile_scorecard(profile: dict):
         mcap_display = f"{mcap/1e7:.0f} Cr" if mcap and mcap >= 1e7 else (f"{mcap:,.0f}" if mcap else "N/A")
         render_metric_card("Market Cap", mcap_display, accent="#4DA6FF")
     with c3:
-        comp_score = inv_score.get("composite_score", "N/A")
-        render_metric_card("Investment Score", f"{comp_score}/100", delta=rec, delta_up=True, accent="#00D4AA")
-    with c4:
-        geo = profile.get("geopolitical", {})
-        render_metric_card("Geo Risk", geo.get("risk_level", "N/A"),
-                           delta=f"{geo.get('overall_score', 'N/A')}/100", accent="#FFA726")
-    with c5:
-        lag = profile.get("smart_money_lag", 0)
-        lag_label = "Opportunity" if lag > 20 else "Neutral" if lag > -10 else "Crowded"
-        render_metric_card("Smart Money Lag", f"{lag}", delta=lag_label, delta_up=lag > 0, accent="#B388FF")
+        screener_score = profile.get("screener_score", "")
+        if tier:
+            render_metric_card("Screener Verdict", tier, delta=f"Score: {screener_score}" if screener_score else "", delta_up=tier in ("Buy Zone", "Watchlist"), accent=tier_color)
+        else:
+            render_metric_card("Screener Verdict", "Not Screened", accent="#8892A0")
 
     # ── Key Financials row ───────────────────────────────────
     f1, f2, f3, f4 = st.columns(4)
@@ -2128,52 +2146,140 @@ def render_stock_profile_scorecard(profile: dict):
     if report:
         lines = [l.strip() for l in report.split("\n")
                  if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("---")]
-        quick_take = " ".join(lines)[:500]
+        quick_take = " ".join(lines)[:1000]
         if quick_take:
             st.markdown(
                 f'<div style="background:rgba(0,212,170,0.05); border:1px solid rgba(0,212,170,0.2); '
                 f'border-radius:10px; padding:14px 18px; margin:8px 0 12px 0;">'
-                f'<div style="color:#00D4AA; font-weight:700; font-size:0.8rem; margin-bottom:6px; '
-                f'text-transform:uppercase; letter-spacing:0.05em;">Quick Take</div>'
-                f'<div style="color:#C8CED6; font-size:0.9rem; line-height:1.6;">{quick_take}...</div>'
+                f'<div style="color:#00D4AA; font-weight:700; font-size:0.85rem; margin-bottom:8px; '
+                f'text-transform:uppercase; letter-spacing:0.06em;">Quick Take</div>'
+                f'<div style="color:#C8CED6; font-size:0.9rem; line-height:1.65;">{quick_take}...</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 
-    # ── USP Analysis (expanded by default) ───────────────────
-    with st.expander("USP Analysis Details", expanded=True):
-        ucol1, ucol2 = st.columns(2)
-        with ucol1:
-            st.markdown("**Geopolitical Risk**")
-            geo = profile.get("geopolitical", {})
-            st.write(f"- Trade Risk: {geo.get('trade_risk_score', 'N/A')}/100")
-            st.write(f"- Policy Risk: {geo.get('policy_risk_score', 'N/A')}/100")
-            st.write(f"- Commodity Risk: {geo.get('commodity_risk_score', 'N/A')}/100")
-            st.write(f"- Event Risk: {geo.get('event_risk_score', 'N/A')}/100")
-            st.markdown("**Management Credibility**")
-            cred = profile.get("credibility", {})
-            st.write(f"- Score: {cred.get('score', 'N/A')}/100 ({cred.get('method', '')})")
-            st.write(f"- {cred.get('reasoning', 'N/A')}")
-        with ucol2:
-            st.markdown("**Regulatory Environment**")
-            reg = profile.get("regulatory", {})
-            st.write(f"- Net Signal: {reg.get('net_signal', 'N/A')} (Score: {reg.get('score', 'N/A')})")
-            tailwinds = reg.get("tailwind_policies", [])
-            if tailwinds:
-                st.write(f"- Tailwinds: {', '.join(tailwinds)}")
-            headwinds = reg.get("headwind_policies", [])
-            if headwinds:
-                st.write(f"- Headwinds: {', '.join(headwinds)}")
-            st.markdown("**Promoter Behavior**")
-            buying = profile.get("promoter_buying", {})
-            st.write(f"- Signal: {buying.get('signal', 'N/A')}")
-            st.write(f"- Buys: {buying.get('buys', 0)} | Sells: {buying.get('sells', 0)}")
-            rpt = profile.get("related_party", {})
-            st.write(f"- RPT Anomaly: {'Yes' if rpt.get('has_anomaly') else 'No'}")
+    # ── Research Summary (agent-derived insights) ────────────
+    dcf = research.get("dcf_valuation", {})
+    sentiment = research.get("sentiment_scores", {})
+    peers = research.get("peer_comparison", [])
+    indian_m = research.get("indian_metrics", {})
+    has_research = dcf or sentiment or peers or indian_m
 
-    if inv_score and "dimension_scores" in inv_score:
-        with st.expander("Investment Score Breakdown", expanded=False):
-            render_investment_score(inv_score)
+    if has_research:
+        st.markdown(
+            '<div style="color:#E8ECF1; font-weight:700; font-size:0.85rem; margin:12px 0 8px 0; '
+            'text-transform:uppercase; letter-spacing:0.06em;">Research Insights <span style="color:#9AA2B0; '
+            'font-weight:400; font-size:0.75rem; text-transform:none;">(from AI agents)</span></div>',
+            unsafe_allow_html=True,
+        )
+        rc1, rc2, rc3, rc4 = st.columns(4)
+        with rc1:
+            if dcf and dcf.get("intrinsic_value"):
+                upside = dcf.get("upside_pct", "N/A")
+                up_color = "#00D4AA" if isinstance(upside, (int, float)) and upside > 0 else "#FF4757"
+                render_metric_card("DCF Value", f"INR {dcf['intrinsic_value']}", delta=f"Upside: {upside}%", delta_up=isinstance(upside, (int, float)) and upside > 0, accent=up_color)
+            else:
+                render_metric_card("DCF Value", "N/A", accent="#8892A0")
+        with rc2:
+            s_label = sentiment.get("label", "")
+            s_score = sentiment.get("overall_score")
+            if s_label or (s_score is not None and s_score != 0):
+                display_label = s_label or ("Bullish" if s_score and s_score > 60 else "Bearish" if s_score and s_score < 40 else "Neutral")
+                s_colors = {"Bullish": "#00D4AA", "Bearish": "#FF4757", "Neutral": "#FFA726"}
+                render_metric_card("Sentiment", display_label, delta=f"Score: {s_score}" if s_score else "", accent=s_colors.get(display_label, "#9AA2B0"))
+            else:
+                render_metric_card("Sentiment", "Neutral", accent="#FFA726")
+        with rc3:
+            roce = indian_m.get("roce", {})
+            if roce:
+                render_metric_card("ROCE", f"{roce.get('roce_value', 'N/A')}", delta=roce.get("rating", ""), accent="#B388FF")
+            else:
+                render_metric_card("ROCE", "N/A", accent="#8892A0")
+        with rc4:
+            if isinstance(peers, list) and peers:
+                peer_count = len(peers)
+                render_metric_card("Peers Compared", f"{peer_count} stocks", accent="#4DA6FF")
+            else:
+                render_metric_card("Peer Analysis", "N/A", accent="#8892A0")
+
+    # ── USP Commentary (from screener data when available) ────
+    screener_commentary = profile.get("screener_commentary", {})
+    screener_usp = profile.get("screener_usp", {})
+
+    if screener_commentary or screener_usp:
+        # Rich commentary from screener pipeline
+        with st.expander("Screening Analysis & Commentary", expanded=True):
+            # Investment thesis + catalysts + risks
+            thesis = screener_commentary.get("investment_thesis", "")
+            catalysts = screener_commentary.get("key_catalysts", [])
+            risks = screener_commentary.get("key_risks", [])
+            watch = screener_commentary.get("what_to_watch", [])
+
+            if thesis:
+                st.markdown(
+                    f'<div style="background:rgba(0,212,170,0.05); border-left:3px solid #00D4AA; '
+                    f'border-radius:6px; padding:10px 14px; margin-bottom:10px;">'
+                    f'<div style="color:#00D4AA; font-weight:700; font-size:0.8rem; text-transform:uppercase; '
+                    f'letter-spacing:0.05em; margin-bottom:4px;">Investment Thesis</div>'
+                    f'<div style="color:#C8CED6; font-size:0.88rem; line-height:1.6;">{thesis}</div>'
+                    f'</div>', unsafe_allow_html=True,
+                )
+            if catalysts:
+                st.markdown(f"**Key Catalysts:** {', '.join(catalysts) if isinstance(catalysts, list) else catalysts}")
+            if risks:
+                st.markdown(f"**Key Risks:** {', '.join(risks) if isinstance(risks, list) else risks}")
+            if watch:
+                st.markdown(f"**What to Watch:** {', '.join(watch) if isinstance(watch, list) else watch}")
+
+            # USP dimension summaries (compact)
+            if screener_usp:
+                st.markdown("---")
+                dim_cols = st.columns(5)
+                dim_names = [
+                    ("geopolitical", "Geo Risk", "#FFA726"),
+                    ("smart_money", "Smart Money", "#B388FF"),
+                    ("regulatory", "Regulatory", "#4DA6FF"),
+                    ("mgmt_credibility", "Mgmt Cred", "#00D4AA"),
+                    ("promoter", "Promoter", "#FF6B6B"),
+                ]
+                for i, (dim_key, dim_label, dim_color) in enumerate(dim_names):
+                    dim_data = screener_usp.get(dim_key, {})
+                    if dim_data:
+                        score = dim_data.get("score", dim_data.get("_composite", "N/A"))
+                        level = dim_data.get("level", "")
+                        with dim_cols[i]:
+                            st.markdown(
+                                f'<div style="text-align:center; padding:6px;">'
+                                f'<div style="color:{dim_color}; font-size:1.2rem; font-weight:800;">{score}</div>'
+                                f'<div style="color:#9AA2B0; font-size:0.72rem; text-transform:uppercase; '
+                                f'letter-spacing:0.04em;">{dim_label}</div>'
+                                f'{"<div style=&quot;color:#C8CED6; font-size:0.75rem;&quot;>" + level + "</div>" if level else ""}'
+                                f'</div>', unsafe_allow_html=True,
+                            )
+    else:
+        # Fallback: show raw USP data from deep dive profile (no screener run)
+        geo = profile.get("geopolitical", {})
+        reg = profile.get("regulatory", {})
+        cred = profile.get("credibility", {})
+        buying = profile.get("promoter_buying", {})
+        if geo or reg or cred or buying:
+            with st.expander("Risk & Governance", expanded=False):
+                ucol1, ucol2 = st.columns(2)
+                with ucol1:
+                    if geo:
+                        st.markdown("**Geopolitical Risk**")
+                        st.write(f"- Overall: {geo.get('overall_score', 'N/A')}/100")
+                        st.write(f"- Risk Level: {geo.get('risk_level', 'N/A')}")
+                    if cred:
+                        st.markdown("**Management Credibility**")
+                        st.write(f"- Score: {cred.get('score', 'N/A')}/100 ({cred.get('method', '')})")
+                with ucol2:
+                    if reg:
+                        st.markdown("**Regulatory**")
+                        st.write(f"- Signal: {reg.get('net_signal', 'N/A')} (Score: {reg.get('score', 'N/A')})")
+                    if buying:
+                        st.markdown("**Promoter**")
+                        st.write(f"- Signal: {buying.get('signal', 'N/A')}")
 
 
 def render_deep_dive_chat(profile: dict, messages_key: str, ticker_key: str):
@@ -2187,9 +2293,15 @@ def render_deep_dive_chat(profile: dict, messages_key: str, ticker_key: str):
     info = profile.get("info", {})
     company_name = info.get("longName", info.get("shortName", profile.get("ticker", "")))
 
-    st.divider()
-    st.markdown("### Ask Questions About This Stock")
-    st.caption("Examples: Products offered, revenue by segment, competitors, competitive edge, strengths, risks, red flags")
+    st.markdown("")  # spacer
+    st.markdown(
+        '<div style="background:linear-gradient(135deg,rgba(0,212,170,0.06),rgba(77,166,255,0.06)); '
+        'border:1px solid #1E2A3A; border-radius:10px; padding:16px 20px; margin:12px 0;">'
+        '<div style="color:#E8ECF1; font-size:1.1rem; font-weight:700; margin-bottom:4px;">Ask Questions About This Stock</div>'
+        '<div style="color:#9AA2B0; font-size:0.82rem;">Products offered · Revenue by segment · Competitors · Competitive edge · Strengths · Risks · Red flags</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     # Display chat history
     messages = st.session_state.get(messages_key, [])
@@ -2234,10 +2346,52 @@ def _render_regime_banner(cdata: dict):
         st.markdown(
             f'<div style="background:{color}20; border:2px solid {color}; border-radius:10px; padding:12px; margin-bottom:16px;">'
             f'<span style="font-size:1.3rem; font-weight:700; color:{color};">Market Regime: {regime_name}</span>'
-            f'<span style="margin-left:20px; color:#666;">{regime.get("reasoning", "")}{vix_text}</span>'
+            f'<span style="margin-left:20px; color:#9AA2B0; font-size:0.9rem;">{regime.get("reasoning", "")}{vix_text}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
+
+
+def _inject_screener_context(profile: dict, ticker: str, cdata: dict) -> dict:
+    """Inject screener USP data, tier info, and commentary into a deep dive profile.
+
+    Mutates and returns the profile dict with screener_usp, screener_tier,
+    screener_score, and screener_commentary keys.
+    """
+    if not cdata:
+        return profile
+
+    # Inject USP cards
+    usp_cards = cdata.get("usp_cards", {})
+    clean_ticker = ticker.replace(".NS", "").replace(".BO", "")
+    if clean_ticker in usp_cards:
+        usp_data = usp_cards[clean_ticker]
+        profile["screener_usp"] = usp_data
+        # Extract commentary from USP card if present
+        commentary = {}
+        if usp_data.get("investment_thesis"):
+            commentary["investment_thesis"] = usp_data["investment_thesis"]
+        if usp_data.get("key_catalysts"):
+            commentary["key_catalysts"] = usp_data["key_catalysts"]
+        if usp_data.get("key_risks"):
+            commentary["key_risks"] = usp_data["key_risks"]
+        if usp_data.get("what_to_watch"):
+            commentary["what_to_watch"] = usp_data["what_to_watch"]
+        if commentary:
+            profile["screener_commentary"] = commentary
+
+    # Inject tier info from category results
+    cat_results = cdata.get("category_results", {})
+    for cat_key, cat_stocks in cat_results.items():
+        stock_list = cat_stocks if isinstance(cat_stocks, list) else cat_stocks.get("stocks", [])
+        for s in stock_list:
+            s_ticker = (s.get("ticker") or "").replace(".NS", "").replace(".BO", "")
+            if s_ticker == clean_ticker:
+                profile["screener_tier"] = s.get("tier_label", s.get("tier", ""))
+                profile["screener_score"] = f"{s.get('score', 0)}/{s.get('active_total', '?')}"
+                break
+
+    return profile
 
 
 def _render_screener_results(cdata: dict, category_key: str, criteria_groups: list, accent_color: str):
@@ -2321,8 +2475,8 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     f'padding:12px 20px; margin:16px 0 8px 0; '
                     f'display:flex; align-items:center; gap:10px;">'
                     f'<span style="font-size:1.3rem;">{tc["icon"]}</span>'
-                    f'<span style="font-size:1rem; font-weight:700; color:{tc["color"]};">{tc["label"]}</span>'
-                    f'<span style="color:#8892A0; font-size:0.85rem;">— {len(tier_stocks)} stocks</span>'
+                    f'<span style="font-size:1.05rem; font-weight:700; color:{tc["color"]}; letter-spacing:0.02em;">{tc["label"]}</span>'
+                    f'<span style="color:#9AA2B0; font-size:0.85rem; font-weight:500;">— {len(tier_stocks)} stock{"s" if len(tier_stocks) != 1 else ""}</span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -2369,7 +2523,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                         if tier_key == "near_miss" and s.get("near_miss_reason"):
                             st.markdown(
                                 f'<div style="background:#FFA72615; border:1px solid #FFA72640; '
-                                f'border-radius:8px; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#FFA726;">'
+                                f'border-radius:8px; padding:10px 14px; margin-bottom:10px; font-size:13px; color:#FFA726; line-height:1.5;">'
                                 f'{s["near_miss_reason"]}</div>',
                                 unsafe_allow_html=True,
                             )
@@ -2570,7 +2724,7 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     with gc2:
                         st.markdown(
                             f'<div class="debate-card" style="border-left:3px solid {conv_color};">'
-                            f'<div style="color:#E8ECF1; font-size:0.95rem;">{verdict.get("reasoning", "")}</div>'
+                            f'<div style="color:#E8ECF1; font-size:0.92rem; line-height:1.6;">{verdict.get("reasoning", "")}</div>'
                             f'</div>',
                             unsafe_allow_html=True,
                         )
@@ -2609,17 +2763,17 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     c1, c2 = st.columns(2)
                     with c1:
                         st.markdown(
-                            f'<div style="margin:4px 0;"><span style="color:#00D4AA; font-size:12px; font-weight:600;">BULL STRENGTH {bull_str}/10</span>'
-                            f'<div style="background:#1A1F2E; border-radius:4px; height:8px; margin-top:4px;">'
-                            f'<div style="background:#00D4AA; width:{bull_str*10}%; height:100%; border-radius:4px;"></div>'
+                            f'<div style="margin:6px 0;"><span style="color:#00D4AA; font-size:12px; font-weight:600; letter-spacing:0.04em;">BULL STRENGTH {bull_str}/10</span>'
+                            f'<div style="background:#1A1F2E; border-radius:5px; height:10px; margin-top:6px;">'
+                            f'<div style="background:linear-gradient(90deg,#00D4AA,#00E4BA); width:{bull_str*10}%; height:100%; border-radius:5px;"></div>'
                             f'</div></div>',
                             unsafe_allow_html=True,
                         )
                     with c2:
                         st.markdown(
-                            f'<div style="margin:4px 0;"><span style="color:#FF4757; font-size:12px; font-weight:600;">BEAR STRENGTH {bear_str}/10</span>'
-                            f'<div style="background:#1A1F2E; border-radius:4px; height:8px; margin-top:4px;">'
-                            f'<div style="background:#FF4757; width:{bear_str*10}%; height:100%; border-radius:4px;"></div>'
+                            f'<div style="margin:6px 0;"><span style="color:#FF4757; font-size:12px; font-weight:600; letter-spacing:0.04em;">BEAR STRENGTH {bear_str}/10</span>'
+                            f'<div style="background:#1A1F2E; border-radius:5px; height:10px; margin-top:6px;">'
+                            f'<div style="background:linear-gradient(90deg,#FF4757,#FF6E7A); width:{bear_str*10}%; height:100%; border-radius:5px;"></div>'
                             f'</div></div>',
                             unsafe_allow_html=True,
                         )
@@ -2682,6 +2836,8 @@ def _render_screener_results(cdata: dict, category_key: str, criteria_groups: li
                     try:
                         from app.tools.stock_deep_dive import build_stock_profile
                         profile = build_stock_profile(top_stock_ticker, "NSE", progress_cb=_dd_prog)
+                        # Bridge screener data into the profile
+                        _inject_screener_context(profile, top_stock_ticker, cdata)
                         st.session_state.screener_dd_profile = profile
                         st.session_state.screener_dd_ticker = top_stock_ticker
                         st.session_state.screener_dd_messages = []
